@@ -3,10 +3,10 @@
 ## **1. 프로젝트 개요 (Project Overview)**
 
  * **Notion**
-  * https://www.notion.so/kaywonpacemaker/XR-PBL-270303ad519f8040893ee9ffc5f2bf74
+    * https://www.notion.so/kaywonpacemaker/XR-PBL-270303ad519f8040893ee9ffc5f2bf74
 
  * **Figma**
-  * https://www.figma.com/design/BLxf2tZxQ5weZFxbRaBeCL/XR%EA%B8%B0%EC%88%A0PBL-%EA%B2%BD%ED%9D%AC%EB%8C%80-?node-id=0-1&t=6v04eMJWnNLrkAhg-1
+    * https://www.figma.com/design/BLxf2tZxQ5weZFxbRaBeCL/XR%EA%B8%B0%EC%88%A0PBL-%EA%B2%BD%ED%9D%AC%EB%8C%80-?node-id=0-1&t=6v04eMJWnNLrkAhg-1
 
 
 ## **2. 팀원 (Team Members)**
