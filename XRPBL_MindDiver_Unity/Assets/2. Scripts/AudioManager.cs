@@ -2,32 +2,60 @@ using UnityEngine;
 
 public class AudioManager : MonoBehaviour
 {
-    // 1. 싱글톤 인스턴스
     public static AudioManager Instance { get; private set; }
 
-    // 2. Awake() 함수 구현
+    [Header("Audio Sources")]
+    public AudioSource bgmSource;
+    public AudioSource sfxSource;
+
+    [Header("BGM Clips")]
+    public AudioClip bgm_MainMenu;
+    public AudioClip bgm_Phase1;
+    public AudioClip bgm_Phase2;
+    public AudioClip bgm_Boss;
+
+    [Header("SFX Clips")]
+    public AudioClip sfx_Touch;
+    public AudioClip sfx_Explosion;
+    public AudioClip sfx_ShieldHit;
+    public AudioClip sfx_ItemCollect;
+
     private void Awake()
     {
         if (Instance == null)
         {
             Instance = this;
-            DontDestroyOnLoad(gameObject); // 씬이 바뀌어도 파괴되지 않음
+            DontDestroyOnLoad(gameObject);
         }
         else
         {
-            Destroy(gameObject); // 이미 인스턴스가 있다면 이 오브젝트는 파괴
+            Destroy(gameObject);
         }
     }
 
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
-        {
-        
-        }
-
-    // Update is called once per frame
-    void Update()
+    public void PlayBGM(AudioClip clip)
     {
-        
+        if (bgmSource.clip == clip) return;
+
+        bgmSource.Stop();
+        bgmSource.clip = clip;
+        bgmSource.Play();
+    }
+
+    public void PlaySFX(AudioClip clip)
+    {
+        sfxSource.PlayOneShot(clip);
+    }
+
+    // 이름으로 재생 (편의성)
+    public void PlaySFX(string sfxName)
+    {
+        switch (sfxName)
+        {
+            case "Touch": PlaySFX(sfx_Touch); break;
+            case "Explosion": PlaySFX(sfx_Explosion); break;
+            case "ShieldHit": PlaySFX(sfx_ShieldHit); break;
+            case "Collect": PlaySFX(sfx_ItemCollect); break;
+        }
     }
 }
