@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class IrregularBoundaryFollower : MonoBehaviour
+public class EnemyMover : MonoBehaviour
 {
     [Header("추적 설정")]
     public Transform target; // 플레이어 Transform
