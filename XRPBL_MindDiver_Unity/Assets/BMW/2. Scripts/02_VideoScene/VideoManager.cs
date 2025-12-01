@@ -1,31 +1,42 @@
 using UnityEngine;
 using UnityEngine.Video;
 
+/// <summary>
+/// 인트로 및 아웃트로 상황에 맞춰 3면 파노라마 비디오 재생을 관리하는 클래스
+/// </summary>
 public class VideoManager : MonoBehaviour
 {
+    #region Inspector Fields
     [Header("Video Players Settings (Order: 0=Front, 1=Left, 2=Right)")]
-    // [변경됨] VideoPlayer도 배열로 묶어서 관리
+    // 3면 파노라마 재생을 위한 비디오 플레이어 배열
     public VideoPlayer[] videoPlayers;
 
     [Header("Video Clips Settings (Order: 0=Front, 1=Left, 2=Right)")]
-    // [변경됨] 개별 변수 대신 배열로 관리 (행렬/리스트 형식)
+    // 인트로용 비디오 클립 배열
     public VideoClip[] introClips;
+    // 아웃트로용 비디오 클립 배열
     public VideoClip[] outroClips;
 
-    [Header("디버그 로그")]
+    [Header("Debug Settings")]
+    // 디버그 로그 출력 여부
     [SerializeField] private bool isDebugMode = true;
+    #endregion
 
+    #region Unity Lifecycle
+    /*
+     * 초기화 및 비디오 타입에 따른 재생 로직 수행
+     */
     private void Start()
     {
         // 플레이어 배열 유효성 검사
         if (!CheckArrayValid(videoPlayers, "Video Players")) return;
 
-        // 1. DataManager에서 어떤 비디오 타입인지 확인
+        // 1. DataManager에서 현재 재생할 비디오 타입 확인
         DataManager.VideoType type = DataManager.Instance.currentVideoType;
 
         Log($"[VideoManager] Playing {type} Video (3-Screen Panoramic)...");
 
-        // 2. 타입에 따라 알맞은 3개의 클립 세팅 및 재생
+        // 2. 타입에 따른 3면 클립 설정 및 재생
         // 배열 인덱스: 0=Front, 1=Left, 2=Right
         if (type == DataManager.VideoType.Intro)
         {
@@ -49,8 +60,12 @@ public class VideoManager : MonoBehaviour
             videoPlayers[0].loopPointReached += OnVideoFinished;
         }
     }
+    #endregion
 
-    // 배열 유효성 검사 (최소 3개인지 확인)
+    #region Helper Methods
+    /*
+     * 배열의 최소 길이 만족 여부(3개 이상)를 확인하는 검사 함수
+     */
     private bool CheckArrayValid(System.Array array, string arrayName)
     {
         if (array == null || array.Length < 3)
@@ -67,6 +82,9 @@ public class VideoManager : MonoBehaviour
         return true;
     }
 
+    /*
+     * 3개의 화면에 비디오 클립을 할당하고 동시 재생하는 함수
+     */
     private void PlayPanoramicVideo(VideoClip[] clips)
     {
         // 3면 반복 처리 (0: Front, 1: Left, 2: Right)
@@ -77,7 +95,7 @@ public class VideoManager : MonoBehaviour
             {
                 videoPlayers[i].clip = clips[i];
 
-                // 사이드 화면(1, 2) 오디오 음소거 옵션 (필요시 주석 해제)
+                // 사이드 화면(1, 2) 오디오 음소거 옵션 (필요 시 주석 해제)
                 // if (i > 0) videoPlayers[i].SetDirectAudioMute(0, true);
 
                 videoPlayers[i].Play();
@@ -91,7 +109,19 @@ public class VideoManager : MonoBehaviour
         }
     }
 
-    // 비디오 재생이 끝났을 때 호출됨
+    /*
+     * 디버그 모드 시 로그 출력 수행
+     */
+    public void Log(string message)
+    {
+        if (isDebugMode) Debug.Log(message);
+    }
+    #endregion
+
+    #region Event Handlers
+    /*
+     * 비디오 재생 완료 시 호출되어 다음 씬으로 전환하는 콜백 함수
+     */
     private void OnVideoFinished(VideoPlayer vp)
     {
         Log("[VideoManager] Video Finished.");
@@ -102,21 +132,20 @@ public class VideoManager : MonoBehaviour
             videoPlayers[0].loopPointReached -= OnVideoFinished;
         }
 
-        // 다음 씬 전환
-        DataManager.VideoType type = DataManager.Instance.currentVideoType;
+        // 비디오 타입에 따른 다음 씬 전환 처리
+        if (DataManager.Instance != null && GameManager.Instance != null)
+        {
+            DataManager.VideoType type = DataManager.Instance.currentVideoType;
 
-        if (type == DataManager.VideoType.Intro)
-        {
-            GameManager.Instance.ChangeState(GameManager.GameState.CharacterSelect);
-        }
-        else if (type == DataManager.VideoType.Outro)
-        {
-            GameManager.Instance.ChangeState(GameManager.GameState.Result);
+            if (type == DataManager.VideoType.Intro)
+            {
+                GameManager.Instance.ChangeState(GameManager.GameState.CharacterSelect);
+            }
+            else if (type == DataManager.VideoType.Outro)
+            {
+                GameManager.Instance.ChangeState(GameManager.GameState.Result);
+            }
         }
     }
-
-    public void Log(string message)
-    {
-        if (isDebugMode) Debug.Log(message);
-    }
+    #endregion
 }
