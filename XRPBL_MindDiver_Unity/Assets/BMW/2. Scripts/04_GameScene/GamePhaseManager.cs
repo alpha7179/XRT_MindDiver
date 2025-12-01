@@ -77,7 +77,7 @@ public class GamePhaseManager : MonoBehaviour
         // PrePhase 시작
         StartPhase(Phase.PrePhase);
 
-        if (PlayerShipController.Instance != null) PlayerShipController.Instance.SetMoveAction(false);
+        if (PlayerMover.Instance != null) PlayerMover.Instance.SetMoveAction(false);
 
         IngameUIManager.Instance.OpenMainPanel();
         IngameUIManager.Instance.OpenInfoPanel();
@@ -85,7 +85,7 @@ public class GamePhaseManager : MonoBehaviour
         // Phase 1 시작
         StartPhase(Phase.Phase1);
 
-        if (PlayerShipController.Instance != null) PlayerShipController.Instance.SetMoveAction(true);
+        if (PlayerMover.Instance != null) PlayerMover.Instance.SetMoveAction(true);
 
         if (phase1TargetZone != null) phase1TargetZone.SetActive(true);
         isZoneReached = false;

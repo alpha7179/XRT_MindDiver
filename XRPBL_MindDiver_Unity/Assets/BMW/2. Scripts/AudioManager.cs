@@ -1,4 +1,4 @@
-using System.Collections; // [추가] 코루틴 사용을 위해 필요
+using System.Collections; //  코루틴 사용을 위해 필요
 using UnityEngine;
 using static GameManager;
 using static GamePhaseManager;
@@ -47,9 +47,9 @@ public class AudioManager : MonoBehaviour
     #endregion
 
     #region Private Fields
-    // [추가] BGM 초기 볼륨 기억용 변수
+    //  BGM 초기 볼륨 기억용 변수
     private float _initialBgmVolume = 1f;
-    // [추가] 현재 실행 중인 페이드 코루틴 저장용
+    //  현재 실행 중인 페이드 코루틴 저장용
     private Coroutine _bgmFadeCoroutine;
     #endregion
 
@@ -65,7 +65,7 @@ public class AudioManager : MonoBehaviour
             transform.parent = null;
             DontDestroyOnLoad(gameObject);
 
-            // [추가] 시작할 때 설정된 BGM 볼륨 저장 (나중에 페이드 아웃 후 복구할 때 사용)
+            //  시작할 때 설정된 BGM 볼륨 저장 (나중에 페이드 아웃 후 복구할 때 사용)
             if (bgmSource != null) _initialBgmVolume = bgmSource.volume;
         }
         else
@@ -83,7 +83,7 @@ public class AudioManager : MonoBehaviour
     {
         if (bgmSource.clip == clip && bgmSource.isPlaying) return;
 
-        // [추가] 페이드 아웃 중에 다른 BGM을 틀어야 한다면, 페이드 중지 후 볼륨 복구
+        // 페이드 아웃 중에 다른 BGM을 틀어야 한다면, 페이드 중지 후 볼륨 복구
         if (_bgmFadeCoroutine != null) StopCoroutine(_bgmFadeCoroutine);
         bgmSource.volume = _initialBgmVolume;
 
@@ -137,7 +137,7 @@ public class AudioManager : MonoBehaviour
         }
     }
 
-    // [추가] 서서히 볼륨을 줄이는 코루틴
+    //  서서히 볼륨을 줄이는 코루틴
     private IEnumerator FadeOutRoutine(float duration)
     {
         float startVolume = bgmSource.volume;
