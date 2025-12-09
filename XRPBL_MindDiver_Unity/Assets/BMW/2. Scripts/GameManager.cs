@@ -23,6 +23,8 @@ public class GameManager : MonoBehaviour
     public string CurrentSceneName;
     // 현재 게임 상태 저장
     public GameState currentState;
+    // 현재 게임 상태 저장
+    public PlayState currentPlayState = PlayState.Test;
     #endregion
 
     #region Events
@@ -46,6 +48,12 @@ public class GameManager : MonoBehaviour
         GameStage,
         OutroVideo,
         Result
+    }
+
+    public enum PlayState
+    {
+        Play,
+        Test,
     }
     #endregion
 

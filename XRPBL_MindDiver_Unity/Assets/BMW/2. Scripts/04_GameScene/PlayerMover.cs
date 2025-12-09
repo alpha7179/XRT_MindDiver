@@ -52,7 +52,6 @@ public class PlayerMover : MonoBehaviour
         else Destroy(gameObject);
 
         _rb = GetComponent<Rigidbody>();
-        // 초기 속도를 기본 속도로 설정
         _currentForwardSpeed = defaultSpeed;
 
         SetMoveAction(false);
@@ -63,20 +62,23 @@ public class PlayerMover : MonoBehaviour
         // 1. 움직임이 불가능한 상태면 입력 처리도 하지 않음
         if (!canMove)
         {
-            _input = Vector2.zero; // 입력값 초기화
+            _input = Vector2.zero;
             return;
         }
 
-        // 2. 입력 처리
+        // 2. 이동 입력 처리
         float h = Input.GetAxis("Horizontal");
         float v = Input.GetAxis("Vertical");
 
         _input = new Vector2(h, v);
 
-        // 3. 방향별 최초 1회 로그 출력 로직
+        // 3. 로그 출력 및 화살표 UI 처리
         HandleInputLogging(h, v);
 
-        // 방어막 테스트
+        // 4. 스킬(버프/디버프) 입력 처리 [추가됨]
+        HandleSkillInput();
+
+        // 방어막 테스트 (Space)
         if (Input.GetKeyDown(KeyCode.Space))
         {
             ActivateShield();
@@ -85,55 +87,113 @@ public class PlayerMover : MonoBehaviour
 
     private void FixedUpdate()
     {
-        // 움직임이 허용되지 않으면 물리 이동 로직 실행 안 함
         if (!canMove) return;
 
-        // 1. 전진 속도 계산 (W/S 키 로직)
+        // 1. 전진 속도 계산
         float targetSpeed = defaultSpeed;
 
-        if (_input.y > 0) // W키 (앞): 가속
-        {
-            targetSpeed = maxSpeed;
-        }
-        else if (_input.y < 0) // S키 (뒤): 감속
-        {
-            targetSpeed = minSpeed;
-        }
+        if (_input.y > 0) targetSpeed = maxSpeed;
+        else if (_input.y < 0) targetSpeed = minSpeed;
 
-        // 현재 속도를 목표 속도로 부드럽게 변경 (가속/감속)
         _currentForwardSpeed = Mathf.Lerp(_currentForwardSpeed, targetSpeed, Time.fixedDeltaTime * acceleration);
 
         // 2. 이동 벡터 계산
         float moveZ = _currentForwardSpeed * Time.fixedDeltaTime;
         float moveX = _input.x * strafeSpeed * Time.fixedDeltaTime;
-        float moveY = 0f;
 
-        // 3. 다음 위치 계산
-        Vector3 nextPosition = _rb.position + new Vector3(moveX, moveY, moveZ);
-
-        // 4. 이동 범위 제한 (좌우 X축만 제한)
+        // 3. 다음 위치 계산 및 제한
+        Vector3 nextPosition = _rb.position + new Vector3(moveX, 0f, moveZ);
         nextPosition.x = Mathf.Clamp(nextPosition.x, -xLimit, xLimit);
 
-        // 5. 리지드바디 위치 갱신
+        // 4. 리지드바디 갱신
         _rb.MovePosition(nextPosition);
-
-        // 6. 회전 초기화
         _rb.rotation = Quaternion.identity;
     }
     #endregion
 
     #region Helper Methods
-    public void SetMoveAction( bool value ) { canMove = value; Debug.Log($"Change MoveState : {canMove}"); }
+    public void SetMoveAction(bool value) { canMove = value; Debug.Log($"Change MoveState : {canMove}"); }
 
-    /// <summary>
-    /// 입력값에 따라 처음 눌렀을 때만 로그를 출력합니다.
-    /// </summary>
+    // [추가] 스킬 입력 처리 함수
+    private void HandleSkillInput()
+    {
+        if (DataManager.Instance == null) return;
+
+        // --- 버프 스킬 (X 키) ---
+        if (Input.GetKeyDown(KeyCode.X))
+        {
+            // 1. 임계값(Max) 체크
+            // (DataManager의 maxCharge가 public이라고 가정합니다)
+            if (DataManager.Instance.GetBuffer() >= DataManager.Instance.bufferUse)
+            {
+                Debug.Log("[PlayerMover] Buff Skill Activated!");
+
+                // 2. 활성화 코드 (기능 구현부)
+                /*
+                 * 예: PlayerAttack.Instance.EnablePowerUp();
+                 */
+
+                // 3. 사용량 차감 (현재값 - Max값, 즉 0으로 초기화)
+                int cost = DataManager.Instance.bufferUse;
+                int remain = DataManager.Instance.GetBuffer() - cost;
+                DataManager.Instance.SetBuffer(Mathf.Max(0, remain));
+
+                // 4. 비네팅 효과 활성화 (UI Manager 연동) [cite: 2]
+                // (IngameUIManager에 해당 이벤트를 트리거하는 public 메서드가 필요합니다)
+                if (IngameUIManager.Instance != null)
+                {
+                    // IngameUIManager.Instance.HandleBufferAdded(); // 메서드 접근 제어자가 public이어야 함
+                    // 혹은 아래처럼 별도의 트리거 메서드를 만들어서 호출
+                    IngameUIManager.Instance.Log("Triggering Buff Vignette");
+                    // 기존 로직을 활용하기 위해 임시로 AddBuffer 이벤트를 활용하거나, 
+                    // IngameUIManager에 'TriggerBuffEffect()' Public 함수를 추가하여 호출해야 합니다.
+                    // 여기서는 DataManager의 SetBuffer가 UI 업데이트를 하겠지만, 
+                    // '스킬 사용 효과'를 위해 UI 매니저의 메서드를 직접 호출하는 것이 좋습니다.
+                }
+            }
+            else
+            {
+                Debug.Log("Not enough Buff charge!");
+            }
+        }
+
+        // --- 디버프 스킬 (C 키) ---
+        if (Input.GetKeyDown(KeyCode.C))
+        {
+            // 1. 임계값(Max) 체크 [cite: 1]
+            if (DataManager.Instance.GetDeBuffer() >= DataManager.Instance.debufferUse)
+            {
+                Debug.Log("[PlayerMover] Debuff Skill Activated!");
+
+                // 2. 활성화 코드 (기능 구현부)
+                /* * [Active Code Here]
+                 * 예: EnemyManager.Instance.ApplySlowDown();
+                 */
+
+                // 3. 사용량 차감
+                int cost = DataManager.Instance.debufferUse;
+                int remain = DataManager.Instance.GetDeBuffer() - cost;
+                DataManager.Instance.SetDeBuffer(Mathf.Max(0, remain));
+
+                // 4. 비네팅 효과 활성화
+                if (IngameUIManager.Instance != null)
+                {
+                    IngameUIManager.Instance.Log("Triggering Debuff Vignette");
+                    // IngameUIManager.Instance.TriggerDeBuffEffect(); // Public 메서드 필요
+                }
+            }
+            else
+            {
+                Debug.Log("Not enough Debuff charge!");
+            }
+        }
+    }
+
     private void HandleInputLogging(float h, float v)
     {
-        // 임계값 (조이스틱 노이즈 방지용으로 약간의 여유를 둠)
         float threshold = 0.1f;
 
-        // --- 전진 (W) ---
+        // Forward
         if (v > threshold)
         {
             if (!_loggedForward)
@@ -141,15 +201,12 @@ public class PlayerMover : MonoBehaviour
                 Debug.Log("Forward Input (W) Started");
                 IngameUIManager.Instance.CloseArrowPanel();
                 IngameUIManager.Instance.OpenArrowPanel(1);
-                _loggedForward = true; // 로그 찍음 표시
+                _loggedForward = true;
             }
         }
-        else
-        {
-            _loggedForward = false; // 키를 떼면 다시 초기화
-        }
+        else _loggedForward = false;
 
-        // --- 후진 (S) ---
+        // Backward
         if (v < -threshold)
         {
             if (!_loggedBackward)
@@ -159,12 +216,9 @@ public class PlayerMover : MonoBehaviour
                 _loggedBackward = true;
             }
         }
-        else
-        {
-            _loggedBackward = false;
-        }
+        else _loggedBackward = false;
 
-        // --- 좌측 (A) ---
+        // Left
         if (h < -threshold)
         {
             if (!_loggedLeft)
@@ -175,12 +229,9 @@ public class PlayerMover : MonoBehaviour
                 _loggedLeft = true;
             }
         }
-        else
-        {
-            _loggedLeft = false;
-        }
+        else _loggedLeft = false;
 
-        // --- 우측 (D) ---
+        // Right
         if (h > threshold)
         {
             if (!_loggedRight)
@@ -191,19 +242,14 @@ public class PlayerMover : MonoBehaviour
                 _loggedRight = true;
             }
         }
-        else
-        {
-            _loggedRight = false;
-        }
+        else _loggedRight = false;
     }
 
-    // 외부에서 움직임을 제어하기 위한 함수
     public void SetControlState(bool state)
     {
         canMove = state;
         if (!state)
         {
-            // 멈출 때 속도 관련 변수 초기화가 필요하다면 여기서 수행
             _currentForwardSpeed = 0f;
             _input = Vector2.zero;
         }
