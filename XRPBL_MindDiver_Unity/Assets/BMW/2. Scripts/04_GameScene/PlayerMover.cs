@@ -1,8 +1,9 @@
+using Logitech;
 using UnityEngine;
 using static UnityEngine.Rendering.DebugUI;
 
 /// <summary>
-/// 플레이어 우주선의 평행 이동 및 속도 제어 클래스 (회전 없음)
+/// 플레이어 우주선의 평행 이동 및 속도 제어 클래스 (회전 없음) + 로지텍 휠 지원
 /// </summary>
 public class PlayerMover : MonoBehaviour
 {
@@ -28,6 +29,12 @@ public class PlayerMover : MonoBehaviour
     [SerializeField] private float strafeSpeed = 15f;
     [Tooltip("좌우 이동 범위 제한 (X축)")]
     [SerializeField] private float xLimit = 10f;
+
+    [Header("Logitech Wheel Settings")]
+    [Tooltip("휠 입력 데드존 (미세한 떨림 방지)")]
+    [SerializeField] private float wheelDeadzone = 0.05f;
+    [Tooltip("휠 입력을 사용할지 여부")]
+    [SerializeField] private bool useLogitechWheel = true;
 
     [Header("References")]
     [SerializeField] private GameObject shieldEffect;
@@ -57,6 +64,18 @@ public class PlayerMover : MonoBehaviour
         SetMoveAction(false);
     }
 
+    private void Start()
+    {
+        // 로지텍 SDK 초기화
+        if (useLogitechWheel)
+        {
+            Debug.Log("Initializing Logitech Steering Wheel SDK...");
+            bool init = LogitechGSDK.LogiSteeringInitialize(false);
+            if (init) Debug.Log("Logitech SDK Initialized.");
+            else Debug.LogError("Logitech SDK Initialization Failed!");
+        }
+    }
+
     private void Update()
     {
         // 1. 움직임이 불가능한 상태면 입력 처리도 하지 않음
@@ -66,8 +85,8 @@ public class PlayerMover : MonoBehaviour
             return;
         }
 
-        // 2. 이동 입력 처리
-        float h = Input.GetAxis("Horizontal");
+        // 2. 이동 입력 처리 (키보드 + 휠)
+        float h = GetCombinedHorizontalInput(); // 함수로 분리함
         float v = Input.GetAxis("Vertical");
 
         _input = new Vector2(h, v);
@@ -75,7 +94,7 @@ public class PlayerMover : MonoBehaviour
         // 3. 로그 출력 및 화살표 UI 처리
         HandleInputLogging(h, v);
 
-        // 4. 스킬(버프/디버프) 입력 처리 [추가됨]
+        // 4. 스킬(버프/디버프) 입력 처리
         HandleSkillInput();
 
         // 방어막 테스트 (Space)
@@ -109,12 +128,56 @@ public class PlayerMover : MonoBehaviour
         _rb.MovePosition(nextPosition);
         _rb.rotation = Quaternion.identity;
     }
+
+    private void OnApplicationQuit()
+    {
+        // 종료 시 SDK 해제
+        if (useLogitechWheel)
+        {
+            LogitechGSDK.LogiSteeringShutdown();
+        }
+    }
     #endregion
 
     #region Helper Methods
+
+    /// <summary>
+    /// 키보드 입력과 로지텍 휠 입력을 합쳐서 반환합니다.
+    /// </summary>
+    private float GetCombinedHorizontalInput()
+    {
+        // 1. 키보드 입력
+        float keyboardInput = Input.GetAxis("Horizontal");
+
+        // 2. 휠 입력 (SDK 사용 시)
+        float wheelInput = 0f;
+
+        // [수정] LogiGetState -> LogiGetStateUnity 로 변경
+        if (useLogitechWheel && LogitechGSDK.LogiUpdate() && LogitechGSDK.LogiIsConnected(0))
+        {
+            // Unity Wrapper에서는 함수 이름 뒤에 'Unity'가 붙는 경우가 많습니다.
+            LogitechGSDK.DIJOYSTATE2ENGINES state = LogitechGSDK.LogiGetStateUnity(0);
+
+            // lX는 휠의 회전축 (-32768 ~ 32768 범위)
+            float rawValue = state.lX;
+
+            // 정규화: -1.0 ~ 1.0 사이로 변환
+            wheelInput = rawValue / 32768f;
+
+            // 데드존 처리
+            if (Mathf.Abs(wheelInput) < wheelDeadzone)
+            {
+                wheelInput = 0f;
+            }
+        }
+
+        // 3. 입력 합산 및 제한
+        float combined = keyboardInput + wheelInput;
+        return Mathf.Clamp(combined, -1f, 1f);
+    }
+
     public void SetMoveAction(bool value) { canMove = value; Debug.Log($"Change MoveState : {canMove}"); }
 
-    // [추가] 스킬 입력 처리 함수
     private void HandleSkillInput()
     {
         if (DataManager.Instance == null) return;
@@ -122,33 +185,16 @@ public class PlayerMover : MonoBehaviour
         // --- 버프 스킬 (X 키) ---
         if (Input.GetKeyDown(KeyCode.X))
         {
-            // 1. 임계값(Max) 체크
-            // (DataManager의 maxCharge가 public이라고 가정합니다)
             if (DataManager.Instance.GetBuffer() >= DataManager.Instance.bufferUse)
             {
                 Debug.Log("[PlayerMover] Buff Skill Activated!");
-
-                // 2. 활성화 코드 (기능 구현부)
-                /*
-                 * 예: PlayerAttack.Instance.EnablePowerUp();
-                 */
-
-                // 3. 사용량 차감 (현재값 - Max값, 즉 0으로 초기화)
                 int cost = DataManager.Instance.bufferUse;
                 int remain = DataManager.Instance.GetBuffer() - cost;
                 DataManager.Instance.SetBuffer(Mathf.Max(0, remain));
 
-                // 4. 비네팅 효과 활성화 (UI Manager 연동) [cite: 2]
-                // (IngameUIManager에 해당 이벤트를 트리거하는 public 메서드가 필요합니다)
                 if (IngameUIManager.Instance != null)
                 {
-                    // IngameUIManager.Instance.HandleBufferAdded(); // 메서드 접근 제어자가 public이어야 함
-                    // 혹은 아래처럼 별도의 트리거 메서드를 만들어서 호출
                     IngameUIManager.Instance.Log("Triggering Buff Vignette");
-                    // 기존 로직을 활용하기 위해 임시로 AddBuffer 이벤트를 활용하거나, 
-                    // IngameUIManager에 'TriggerBuffEffect()' Public 함수를 추가하여 호출해야 합니다.
-                    // 여기서는 DataManager의 SetBuffer가 UI 업데이트를 하겠지만, 
-                    // '스킬 사용 효과'를 위해 UI 매니저의 메서드를 직접 호출하는 것이 좋습니다.
                 }
             }
             else
@@ -160,26 +206,16 @@ public class PlayerMover : MonoBehaviour
         // --- 디버프 스킬 (C 키) ---
         if (Input.GetKeyDown(KeyCode.C))
         {
-            // 1. 임계값(Max) 체크 [cite: 1]
             if (DataManager.Instance.GetDeBuffer() >= DataManager.Instance.debufferUse)
             {
                 Debug.Log("[PlayerMover] Debuff Skill Activated!");
-
-                // 2. 활성화 코드 (기능 구현부)
-                /* * [Active Code Here]
-                 * 예: EnemyManager.Instance.ApplySlowDown();
-                 */
-
-                // 3. 사용량 차감
                 int cost = DataManager.Instance.debufferUse;
                 int remain = DataManager.Instance.GetDeBuffer() - cost;
                 DataManager.Instance.SetDeBuffer(Mathf.Max(0, remain));
 
-                // 4. 비네팅 효과 활성화
                 if (IngameUIManager.Instance != null)
                 {
                     IngameUIManager.Instance.Log("Triggering Debuff Vignette");
-                    // IngameUIManager.Instance.TriggerDeBuffEffect(); // Public 메서드 필요
                 }
             }
             else
@@ -223,7 +259,7 @@ public class PlayerMover : MonoBehaviour
         {
             if (!_loggedLeft)
             {
-                Debug.Log("Left Input (A) Started");
+                Debug.Log("Left Input (A) or Wheel Left Started");
                 IngameUIManager.Instance.CloseArrowPanel();
                 IngameUIManager.Instance.OpenArrowPanel(2);
                 _loggedLeft = true;
@@ -236,7 +272,7 @@ public class PlayerMover : MonoBehaviour
         {
             if (!_loggedRight)
             {
-                Debug.Log("Right Input (D) Started");
+                Debug.Log("Right Input (D) or Wheel Right Started");
                 IngameUIManager.Instance.CloseArrowPanel();
                 IngameUIManager.Instance.OpenArrowPanel(3);
                 _loggedRight = true;
