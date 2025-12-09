@@ -41,8 +41,12 @@ public class DataManager : MonoBehaviour
     [SerializeField][Range(0, 100)] private int shipShield;
     // 최대 쉴드 수치
     [SerializeField] public int maxShipShield = 100;
+    // 버퍼 게이지 사용량
+    [SerializeField][Range(0, 10)] public int bufferUse = 5;
     // 버퍼 게이지 충전량
     [SerializeField][Range(0, 10)] private int bufferCharge;
+    // 버퍼 게이지 사용량
+    [SerializeField][Range(0, 10)] public int debufferUse = 5;
     // 디버퍼 게이지 충전량
     [SerializeField][Range(0, 10)] private int debufferCharge;
     // 게이지 최대 충전량

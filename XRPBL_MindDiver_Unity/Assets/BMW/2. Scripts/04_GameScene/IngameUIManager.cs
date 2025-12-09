@@ -73,10 +73,12 @@ public class IngameUIManager : MonoBehaviour
     [Header("Vignette Colors")]
     [Tooltip("체력 데미지 시 색상 (빨강)")]
     [SerializeField] private Color damageColor = Color.red;
-    [Tooltip("쉴드 데미지 시 색상 (파랑/하늘)")]
-    [SerializeField] private Color shieldDamageColor = Color.cyan;
-    [Tooltip("버프 획득 시 색상 (노랑)")]
+    [Tooltip("쉴드 데미지 시 색상 (파란)")]
+    [SerializeField] private Color shieldDamageColor = Color.blue;
+    [Tooltip("버프 사용시 시 색상 (노랑)")]
     [SerializeField] private Color bufferColor = Color.yellow;
+    [Tooltip("디버프 사용시 색상 (보라)")]
+    [SerializeField] private Color debufferColor = new Color(0.6f, 0f, 0.8f, 1f);
 
     [Header("Vignette Configuration")]
     [Tooltip("비네팅이 없는 상태의 Radius (기본 0.6)")]
@@ -85,14 +87,21 @@ public class IngameUIManager : MonoBehaviour
     [Tooltip("비네팅이 최대인 상태의 Radius (기본 -0.3)")]
     [SerializeField] private float minRadius = -0.3f;
 
-    [SerializeField] private float bufferEffectDuration = 2.0f;
-    [SerializeField] private float debufferEffectDuration = 2.0f;
+    [Header("Skill Effect Settings")]
+    [Tooltip("버프 효과 지속 시간 (초)")]
+    [SerializeField] private float bufferEffectDuration = 3.0f;
+    [Tooltip("디버프 효과 지속 시간 (초)")]
+    [SerializeField] private float debufferEffectDuration = 5.0f;
+    [Tooltip("스킬 효과 페이드 인/아웃 시간")]
+    [SerializeField] private float skillFadeDuration = 0.5f;
+    [Tooltip("스킬 발동 시 비네팅 반경 (은은한 정도, 0.6~-0.3 사이)")]
+    [SerializeField] private float skillTargetRadius = 0.35f;
 
     [Header("Damage Feedback Settings")]
     [Tooltip("피격 시 데미지 이미지가 유지되는 시간")]
-    [SerializeField] private float damageImageDuration = 0.5f;
+    [SerializeField] private float damageImageDuration = 2.0f;
     [Tooltip("피격 시 비네팅이 확 줄어드는 효과의 지속 시간")]
-    [SerializeField] private float hitVignetteDuration = 0.3f;
+    [SerializeField] private float hitVignetteDuration = 2.0f;
 
     [Header("Debug Settings")]
     // 디버그 로그 출력 여부
@@ -108,8 +117,11 @@ public class IngameUIManager : MonoBehaviour
     // 버프/디버프 관련
     private bool isBufferEffectActive = false;
     private float bufferTimer = 0f;
+    private float currentBufferMaxDuration = 0f; // 현재 실행중인 버프의 총 시간 저장
+
     private bool isDeBufferEffectActive = false;
     private float debufferTimer = 0f;
+    private float currentDebufferMaxDuration = 0f; // 현재 실행중인 디버프의 총 시간 저장
 
     // 피격 효과 관련
     private bool isHitEffectActive = false;
@@ -179,12 +191,10 @@ public class IngameUIManager : MonoBehaviour
     #region Event Handlers
     private void HandleShieldChange(int current, int max)
     {
-        // [변경] 쉴드가 감소했을 때도 피격 효과 발생
         if (current < currentShield)
         {
             TriggerDamageEffect();
         }
-
         currentShield = current;
         maxShield = max;
         UpdateShield(current);
@@ -192,12 +202,10 @@ public class IngameUIManager : MonoBehaviour
 
     private void HandleHealthChange(int current, int max)
     {
-        // 체력이 줄어들었을 때 피격 효과 발생
         if (current < currentHealth)
         {
             TriggerDamageEffect();
         }
-
         currentHealth = current;
         maxHealth = max;
         UpdateHP(current);
@@ -205,15 +213,27 @@ public class IngameUIManager : MonoBehaviour
 
     private void HandleBufferAdded()
     {
-        bufferTimer = bufferEffectDuration;
+        // 버프: 3초 (Inspector 설정값 사용)
+        currentBufferMaxDuration = bufferEffectDuration;
+        bufferTimer = currentBufferMaxDuration;
         isBufferEffectActive = true;
+
+        // 디버프 효과가 있다면 덮어쓰거나 우선순위 결정 (여기선 최근 발동 우선)
+        isDeBufferEffectActive = false;
+
         UpdateBuff(DataManager.Instance.GetBuffer());
     }
 
     private void HandleDeBufferAdded()
     {
-        debufferTimer = debufferEffectDuration;
+        // 디버프: 스킬 지속 시간 (Inspector 설정값 혹은 변수 사용)
+        currentDebufferMaxDuration = debufferEffectDuration;
+        debufferTimer = currentDebufferMaxDuration;
         isDeBufferEffectActive = true;
+
+        // 버프 효과가 있다면 끔
+        isBufferEffectActive = false;
+
         UpdateDeBuff(DataManager.Instance.GetDeBuffer());
     }
 
@@ -227,14 +247,11 @@ public class IngameUIManager : MonoBehaviour
     #region Damage & Character Logic
     private void TriggerDamageEffect()
     {
-        // 1. 비네팅 피격 효과 활성화
         isHitEffectActive = true;
         hitEffectTimer = hitVignetteDuration;
 
-        // 2. 캐릭터 이미지 '데미지(1번)' 상태로 변경
         SetCharacterImageIndex(1);
 
-        // 3. 기존 리셋 코루틴이 있다면 취소하고 새로 시작
         if (characterImageResetRoutine != null) StopCoroutine(characterImageResetRoutine);
         characterImageResetRoutine = StartCoroutine(ResetCharacterImageRoutine());
     }
@@ -242,8 +259,6 @@ public class IngameUIManager : MonoBehaviour
     private IEnumerator ResetCharacterImageRoutine()
     {
         yield return new WaitForSeconds(damageImageDuration);
-
-        // 게임 오버 상태가 아니라면 기본 이미지로 복귀
         if (currentHealth > 0)
         {
             SetCharacterImageIndex(0);
@@ -262,10 +277,7 @@ public class IngameUIManager : MonoBehaviour
         if (images == null) return;
         for (int i = 0; i < images.Count; i++)
         {
-            if (images[i] != null)
-            {
-                images[i].gameObject.SetActive(i == targetIndex);
-            }
+            if (images[i] != null) images[i].gameObject.SetActive(i == targetIndex);
         }
     }
     #endregion
@@ -275,70 +287,98 @@ public class IngameUIManager : MonoBehaviour
     {
         if (vignetteMats.Count == 0) return;
 
-        float targetRadius = maxRadius; // 기본 0.6
+        float targetRadius = maxRadius; // 기본 0.6 (효과 없음)
         Color targetColor = damageColor;
 
-        // 1. 버프 상태 (노란색)
-        if (isBufferEffectActive)
+        // 우선순위 1: 피격 (Hit) - 가장 강렬하고 즉각적
+        if (isHitEffectActive)
+        {
+            // 피격 시 쉴드 유무에 따라 색상 결정
+            targetColor = (currentShield > 0) ? shieldDamageColor : damageColor;
+
+            hitEffectTimer -= Time.deltaTime;
+            if (hitEffectTimer <= 0)
+            {
+                isHitEffectActive = false;
+                // 피격이 끝나면 아래의 다른 상태 로직으로 넘어감
+            }
+            else
+            {
+                // 피격 순간: 최소 반지름(-0.3)까지 갔다가 돌아옴
+                float hitProgress = 1.0f - (hitEffectTimer / hitVignetteDuration);
+                targetRadius = Mathf.Lerp(minRadius, maxRadius, hitProgress); // 강하게 조임
+            }
+        }
+        // 우선순위 2: 버프 (Buff) - 노란색, 은은하게
+        else if (isBufferEffectActive)
         {
             bufferTimer -= Time.deltaTime;
-            if (bufferTimer <= 0) isBufferEffectActive = false;
+
+            if (bufferTimer <= 0)
+            {
+                isBufferEffectActive = false;
+            }
             else
             {
                 targetColor = bufferColor;
-                float pulse = Mathf.Sin(Time.time * 10.0f) * 0.1f;
-                targetRadius = 0.5f + pulse;
+
+                // 은은하게 페이드 인/아웃 계산
+                float intensity = CalculateFadeIntensity(bufferTimer, currentBufferMaxDuration);
+
+                // radius: maxRadius(0.6) -> skillTargetRadius(0.35) -> maxRadius(0.6)
+                targetRadius = Mathf.Lerp(maxRadius, skillTargetRadius, intensity);
+
+                // 알파값도 조절하여 더 부드럽게 (Color 자체의 투명도 조절)
+                targetColor.a = intensity;
             }
         }
+        // 우선순위 3: 디버프 (DeBuff) - 보라색, 은은하게
+        else if (isDeBufferEffectActive)
+        {
+            debufferTimer -= Time.deltaTime;
+
+            if (debufferTimer <= 0)
+            {
+                isDeBufferEffectActive = false;
+            }
+            else
+            {
+                targetColor = debufferColor;
+
+                // 은은하게 페이드 인/아웃 계산
+                float intensity = CalculateFadeIntensity(debufferTimer, currentDebufferMaxDuration);
+
+                // radius: maxRadius(0.6) -> skillTargetRadius(0.35) -> maxRadius(0.6)
+                targetRadius = Mathf.Lerp(maxRadius, skillTargetRadius, intensity);
+
+                targetColor.a = intensity;
+            }
+        }
+        // 우선순위 4: 저체력 경고 (Low Health)
         else
         {
-            // 기본은 데미지 색상(빨강)이지만, 피격 순간 쉴드가 있다면 파란색으로 덮어씀
-            targetColor = damageColor;
-
-            // --- A. 저체력 로직 (Continuous Warning) ---
             float healthRatio = (maxHealth > 0) ? (float)currentHealth / maxHealth : 0f;
-            float healthBasedRadius = maxRadius;
 
             // 체력이 50% 이하일 때 경고 효과
             if (healthRatio <= 0.5f)
             {
+                targetColor = damageColor;
+
                 float t = 1.0f - (healthRatio / 0.5f);
-                healthBasedRadius = Mathf.Lerp(maxRadius, minRadius, t);
+                float healthBasedRadius = Mathf.Lerp(maxRadius, minRadius, t);
 
                 float pulseSpeed = Mathf.Lerp(2.0f, 8.0f, t);
                 float pulseAmp = Mathf.Lerp(0.0f, 0.05f, t);
-                healthBasedRadius += Mathf.Sin(Time.time * pulseSpeed) * pulseAmp;
-            }
-
-            // --- B. 피격 효과 로직 (Sudden Flash) ---
-            if (isHitEffectActive)
-            {
-                // [변경] 피격 시 쉴드가 남아있다면 쉴드 컬러(파랑) 사용
-                if (currentShield > 0)
-                {
-                    targetColor = shieldDamageColor;
-                }
-
-                hitEffectTimer -= Time.deltaTime;
-                if (hitEffectTimer <= 0)
-                {
-                    isHitEffectActive = false;
-                    targetRadius = healthBasedRadius;
-                }
-                else
-                {
-                    // 피격 순간: 최소 반지름(-0.3)까지 갔다가 돌아옴
-                    float hitProgress = 1.0f - (hitEffectTimer / hitVignetteDuration);
-                    targetRadius = Mathf.Lerp(minRadius, healthBasedRadius, hitProgress);
-                }
+                targetRadius = healthBasedRadius + Mathf.Sin(Time.time * pulseSpeed) * pulseAmp;
             }
             else
             {
-                targetRadius = healthBasedRadius;
+                // 평상시
+                targetRadius = maxRadius;
             }
         }
 
-        // 3. 쉐이더 적용
+        // 쉐이더 적용
         foreach (var mat in vignetteMats)
         {
             if (mat != null)
@@ -348,9 +388,37 @@ public class IngameUIManager : MonoBehaviour
             }
         }
     }
+
+    /// <summary>
+    /// 남은 시간과 전체 시간을 기반으로 페이드 인/아웃 강도(0~1)를 반환합니다.
+    /// </summary>
+    private float CalculateFadeIntensity(float currentTimer, float maxDuration)
+    {
+        float timeElapsed = maxDuration - currentTimer;
+        float intensity = 1.0f;
+
+        // 페이드 인 (시작 부분)
+        if (timeElapsed < skillFadeDuration)
+        {
+            intensity = Mathf.SmoothStep(0f, 1f, timeElapsed / skillFadeDuration);
+        }
+        // 페이드 아웃 (끝 부분)
+        else if (currentTimer < skillFadeDuration)
+        {
+            intensity = Mathf.SmoothStep(0f, 1f, currentTimer / skillFadeDuration);
+        }
+        // 유지 (중간)
+        else
+        {
+            intensity = 1.0f;
+        }
+
+        return intensity;
+    }
     #endregion
 
     #region UI Control Methods & Utils
+    // ... (이전 코드와 동일, 생략 없이 사용하시면 됩니다)
     private void InitializePanels()
     {
         SetPanelsActive(mainPanels, false);
@@ -358,7 +426,7 @@ public class IngameUIManager : MonoBehaviour
         SetPanelsActive(instructionPanels, false);
         SetPanelsActive(manualPanels, false);
         SetPanelsActive(pausePanels, false);
-        SetPanelsActive(takenDamagePanels, true);
+        SetPanelsActive(takenDamagePanels, true); // 피격 패널 초기화
 
         if (DataManager.Instance != null)
         {
@@ -414,16 +482,8 @@ public class IngameUIManager : MonoBehaviour
     public void UpdateProgress(float value)
     {
         float clampedValue = Mathf.Clamp(value, 0f, 100f);
-
-        if (progressSlider)
-        {
-            progressSlider.fillAmount = clampedValue / 100f;
-        }
-
-        if (progressText)
-        {
-            progressText.text = $"{((int)clampedValue)} %";
-        }
+        if (progressSlider) progressSlider.fillAmount = clampedValue / 100f;
+        if (progressText) progressText.text = $"{((int)clampedValue)} %";
     }
     public void SetDisplayPanel(bool state) { isDisplayPanel = state; }
     public bool GetDisplayPanel() { return isDisplayPanel; }

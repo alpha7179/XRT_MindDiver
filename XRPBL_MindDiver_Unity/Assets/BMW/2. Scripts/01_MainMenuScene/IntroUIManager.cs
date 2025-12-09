@@ -303,7 +303,8 @@ public class IntroUIManager : MonoBehaviour
         Log("체험을 시작합니다.");
 
         // GameManager를 통한 씬 상태 전환
-        if (GameManager.Instance != null) GameManager.Instance.ChangeState(GameManager.GameState.IntroVideo);
+        if (GameManager.Instance.currentPlayState == GameManager.PlayState.Test) { if (GameManager.Instance != null) GameManager.Instance.ChangeState(GameManager.GameState.GameStage); }
+        else { if (GameManager.Instance != null) GameManager.Instance.ChangeState(GameManager.GameState.IntroVideo); }
     }
 
     public void UpdateBGMVolume(int value)
