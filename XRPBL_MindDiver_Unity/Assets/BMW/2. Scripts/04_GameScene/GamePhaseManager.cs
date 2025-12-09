@@ -213,7 +213,7 @@ public class GamePhaseManager : MonoBehaviour
         float currentDistToTarget = Vector3.Distance(playerTransform.position, phase1TargetZone.transform.position);
 
         // 2. (총 거리 - 남은 거리) = 목표를 향해 실제로 이동한 거리
-        float traveledTowardsTarget = _totalDistance - currentDistToTarget - 3 ;
+        float traveledTowardsTarget = _totalDistance - currentDistToTarget + 5 ;
 
         // 3. 진행률 계산
         float progressPercentage = (traveledTowardsTarget / _totalDistance) * 100f;
