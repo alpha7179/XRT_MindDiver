@@ -119,60 +119,9 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!1 &15825087
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 15825089}
-  - component: {fileID: 15825088}
-  m_Layer: 0
-  m_Name: GameObject
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &15825088
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 15825087}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4c7680e84c9135c429f32cbaa922a8cf, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  currentVideoType: 0
-  BGMVolume: 0
-  SFXVolume: 0
-  videoVolume: 0
-  NARVolume: 0
-  currentLangType: 0
-  progress: 0
-  teamScore: 0
-  shipHealth: 0
-  maxShipHealth: 100
-  shipShield: 0
-  maxShipShield: 100
-  bufferUse: 5
-  bufferCharge: 0
-  debufferUse: 5
-  debufferCharge: 0
-  maxCharge: 10
-  bullet: 0
-  maxBullet: 9999
-  totalPlayTime: 0
-  totalEnemiesKilled: 0
-  totalDamageTaken: 0
-  isDebugMode: 1
---- !u!4 &15825089
-Transform:
+--- !u!21 &37430274
+Material:
+  serializedVersion: 8
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -420,7 +369,7 @@ BoxCollider:
     serializedVersion: 2
     m_Bits: 0
   m_LayerOverridePriority: 0
-  m_IsTrigger: 0
+  m_IsTrigger: 1
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
@@ -1121,7 +1070,7 @@ BoxCollider:
     serializedVersion: 2
     m_Bits: 0
   m_LayerOverridePriority: 0
-  m_IsTrigger: 0
+  m_IsTrigger: 1
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
@@ -1303,7 +1252,7 @@ BoxCollider:
     serializedVersion: 2
     m_Bits: 0
   m_LayerOverridePriority: 0
-  m_IsTrigger: 0
+  m_IsTrigger: 1
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
@@ -1732,6 +1681,47 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!21 &1225943375
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: UI/RoundedCorners/RoundedCorners
+  m_Shader: {fileID: 4800000, guid: 0bd2ec5d73751e34a814274a454bec41, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _MainTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _ColorMask: 15
+    - _Stencil: 0
+    - _StencilComp: 8
+    - _StencilOp: 0
+    - _StencilReadMask: 255
+    - _StencilWriteMask: 255
+    - _UseUIAlphaClip: 0
+    m_Colors:
+    - _OuterUV: {r: 0, g: 0, b: 1, a: 1}
+    - _WidthHeightRadius: {r: 356, g: 356, b: 42.2, a: 0}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
 --- !u!1 &1229214543
 GameObject:
   m_ObjectHideFlags: 0
@@ -1964,6 +1954,7 @@ MonoBehaviour:
   targetChangeInterval: 5
   detectionRadius: 70
   enemydamage: 5
+  printDebug: 0
   primaryCamera: {fileID: 0}
 --- !u!114 &1309002543
 MonoBehaviour:
@@ -2129,6 +2120,7 @@ MonoBehaviour:
   targetChangeInterval: 5
   detectionRadius: 70
   enemydamage: 5
+  printDebug: 0
   primaryCamera: {fileID: 0}
 --- !u!114 &1417070008
 MonoBehaviour:
@@ -3267,7 +3259,7 @@ BoxCollider:
     serializedVersion: 2
     m_Bits: 0
   m_LayerOverridePriority: 0
-  m_IsTrigger: 0
+  m_IsTrigger: 1
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
@@ -3362,6 +3354,7 @@ MonoBehaviour:
   targetChangeInterval: 5
   detectionRadius: 15
   enemydamage: 1
+  printDebug: 0
   primaryCamera: {fileID: 0}
 --- !u!20 &2130118318 stripped
 Camera:
@@ -3541,7 +3534,7 @@ PrefabInstance:
         type: 3}
       propertyPath: m_Material
       value: 
-      objectReference: {fileID: 587733910}
+      objectReference: {fileID: 1225943375}
     - target: {fileID: 9071604123419504790, guid: 20260773591a90e46859f4e1660a811f,
         type: 3}
       propertyPath: m_Name
@@ -3571,7 +3564,6 @@ SceneRoots:
   - {fileID: 445330925}
   - {fileID: 2124475200}
   - {fileID: 948077935}
-  - {fileID: 15825089}
   - {fileID: 1006367413}
   - {fileID: 325154358}
   - {fileID: 1688435914}

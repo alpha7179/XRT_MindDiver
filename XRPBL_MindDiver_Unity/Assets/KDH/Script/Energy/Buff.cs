@@ -12,8 +12,6 @@ public class Buff : EnergyClass
         {
             DataManager.Instance.AddScore(scoreValue);
             DataManager.Instance.AddBuffer(buffValue);
-            //AddShipShield 메서드가 없음
-            //DataManager.Instance.AddShipShield(shieldValue);
         }
         // (디버그용) 현재 총 포인트 출력
         Debug.Log("플레이어 에너지 획득! 현재 총점: " + playerEnergy);

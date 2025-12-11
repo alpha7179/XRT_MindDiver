@@ -1,9 +1,11 @@
 using UnityEngine;
-using static UnityEngine.Rendering.DebugUI;
+using System.Collections;
 
 /// <summary>
-/// 플레이어 우주선의 평행 이동 및 속도 제어 클래스 (회전 없음)
+/// 물리 엔진 기반(Rigidbody Physics) 플레이어 이동 클래스
+/// 기능: 로지텍 휠/페달 + 관성 주행 + 버튼 매핑(GetKeyDown 적용) + 포스 피드백 + 자동 재연결
 /// </summary>
+[RequireComponent(typeof(Rigidbody))]
 public class PlayerMover : MonoBehaviour
 {
     public static PlayerMover Instance { get; private set; }
@@ -11,23 +13,26 @@ public class PlayerMover : MonoBehaviour
     #region Inspector Fields
     [Header("Control Settings")]
     [Tooltip("이 값이 True여야만 움직일 수 있습니다.")]
-    [SerializeField] private bool canMove;
+    [SerializeField] private bool canMove = true;
 
-    [Header("Speed Settings")]
-    [Tooltip("기본 전진 속도")]
-    [SerializeField] private float defaultSpeed = 0f;
-    [Tooltip("W키 누를 시 최대 속도")]
-    [SerializeField] private float maxSpeed = 40f;
-    [Tooltip("S키 누를 시 최소 속도 (감속)")]
-    [SerializeField] private float minSpeed = 0.001f;
-    [Tooltip("속도 변경 반응 속도")]
-    [SerializeField] private float acceleration = 5f;
+    [Header("Physics Settings (Realistic)")]
+    [SerializeField] private float forwardForce = 3000f;
+    [SerializeField] private float reverseForce = 2000f;
+    [SerializeField] private float strafeForce = 2500f;
+    [SerializeField] private float maxSpeed = 30f;
+    [SerializeField] private float xLimit = 12f;
 
-    [Header("Movement Settings")]
-    [Tooltip("좌우(A/D) 이동 속도")]
-    [SerializeField] private float strafeSpeed = 15f;
-    [Tooltip("좌우 이동 범위 제한 (X축)")]
-    [SerializeField] private float xLimit = 10f;
+    [Header("Drag Settings (관성)")]
+    [SerializeField] private float coastingDrag = 1f;
+    [SerializeField] private float brakingDrag = 3f;
+
+    [Header("Logitech Settings")]
+    [SerializeField] private float wheelDeadzone = 0.05f;
+    [SerializeField] private bool useLogitechWheel = true;
+
+    [Header("Force Feedback (핸들 탄성)")]
+    [Range(0, 100)][SerializeField] private int centeringSpringStrength = 50;
+    [Range(0, 100)][SerializeField] private int damperStrength = 30;
 
     [Header("References")]
     [SerializeField] private GameObject shieldEffect;
@@ -36,13 +41,15 @@ public class PlayerMover : MonoBehaviour
     #region Private Fields
     private Rigidbody _rb;
     private Vector2 _input;
-    private float _currentForwardSpeed;
 
-    // 로그 중복 출력을 막기 위한 상태 플래그들
-    private bool _loggedForward = false;
-    private bool _loggedBackward = false;
-    private bool _loggedLeft = false;
-    private bool _loggedRight = false;
+    // SDK 상태 변수
+    private bool _isWheelInitialized = false;
+    private bool _isWheelConnected = false;
+    private LogitechGSDK.DIJOYSTATE2ENGINES _currentState;
+
+    private bool[] _prevButtonStates = new bool[128];
+
+    private OuttroUIManager outtroUIManager;
     #endregion
 
     #region Unity Lifecycle
@@ -52,206 +59,290 @@ public class PlayerMover : MonoBehaviour
         else Destroy(gameObject);
 
         _rb = GetComponent<Rigidbody>();
-        _currentForwardSpeed = defaultSpeed;
+        outtroUIManager = GetComponent<OuttroUIManager>();
 
-        SetMoveAction(false);
+        // 물리 설정
+        _rb.useGravity = false;
+        _rb.constraints = RigidbodyConstraints.FreezeRotation | RigidbodyConstraints.FreezePositionY;
+        _rb.linearDamping = coastingDrag;
+        _rb.mass = 1000f;
+    }
+
+    private void Start()
+    {
+        if (useLogitechWheel)
+        {
+            StartCoroutine(InitializeLogitechSDK());
+        }
+    }
+
+    private IEnumerator InitializeLogitechSDK()
+    {
+        if (_isWheelInitialized) yield break;
+        Debug.Log("[PlayerMover] 로지텍 SDK 연결 대기 중...");
+
+        while (!_isWheelInitialized)
+        {
+            bool result = LogitechGSDK.LogiSteeringInitialize(false);
+            if (result)
+            {
+                _isWheelInitialized = true;
+                Debug.Log("<color=green>[PlayerMover] 로지텍 SDK 초기화 성공!</color>");
+                HandleForceFeedback();
+            }
+            else
+            {
+                Debug.LogWarning("[PlayerMover] SDK 연결 실패. 재시도 중...");
+                yield return new WaitForSeconds(2f);
+            }
+        }
+    }
+
+    private void OnApplicationFocus(bool focus)
+    {
+        if (focus && useLogitechWheel && !_isWheelInitialized)
+        {
+            StartCoroutine(InitializeLogitechSDK());
+        }
     }
 
     private void Update()
     {
-        // 1. 움직임이 불가능한 상태면 입력 처리도 하지 않음
+        CheckGameOver();
+
+        // 1. SDK 업데이트 및 포스 피드백
+        UpdateLogitechState();
+        HandleForceFeedback();
+
+        // 2. 이동 불가 처리
         if (!canMove)
         {
             _input = Vector2.zero;
+            // 이동은 막아도 버튼 상태 업데이트는 해야 다음 프레임에 오작동 안함
+            UpdatePrevButtonStates();
             return;
         }
 
-        // 2. 이동 입력 처리
-        float h = Input.GetAxis("Horizontal");
-        float v = Input.GetAxis("Vertical");
-
+        // 3. 입력 통합
+        float h = GetCombinedHorizontalInput();
+        float v = GetCombinedVerticalInput();
         _input = new Vector2(h, v);
 
-        // 3. 로그 출력 및 화살표 UI 처리
-        HandleInputLogging(h, v);
-
-        // 4. 스킬(버프/디버프) 입력 처리 [추가됨]
+        // 4. 스킬 및 버튼 입력
         HandleSkillInput();
 
-        // 방어막 테스트 (Space)
-        if (Input.GetKeyDown(KeyCode.Space))
-        {
-            ActivateShield();
-        }
+        if (Input.GetKeyDown(KeyCode.Space)) ActivateShield();
+
+        UpdatePrevButtonStates();
     }
 
     private void FixedUpdate()
     {
         if (!canMove) return;
 
-        // 1. 전진 속도 계산
-        float targetSpeed = defaultSpeed;
+        if (_input.y < 0) _rb.linearDamping = brakingDrag;
+        else _rb.linearDamping = coastingDrag;
 
-        if (_input.y > 0) targetSpeed = maxSpeed;
-        else if (_input.y < 0) targetSpeed = minSpeed;
+        Vector3 force = Vector3.zero;
+        if (_input.y > 0) force += transform.forward * _input.y * forwardForce;
+        else if (_input.y < 0) force += transform.forward * _input.y * reverseForce;
+        force += transform.right * _input.x * strafeForce;
 
-        _currentForwardSpeed = Mathf.Lerp(_currentForwardSpeed, targetSpeed, Time.fixedDeltaTime * acceleration);
+        _rb.AddForce(force, ForceMode.Force);
 
-        // 2. 이동 벡터 계산
-        float moveZ = _currentForwardSpeed * Time.fixedDeltaTime;
-        float moveX = _input.x * strafeSpeed * Time.fixedDeltaTime;
+        if (_rb.linearVelocity.magnitude > maxSpeed)
+        {
+            _rb.linearVelocity = _rb.linearVelocity.normalized * maxSpeed;
+        }
 
-        // 3. 다음 위치 계산 및 제한
-        Vector3 nextPosition = _rb.position + new Vector3(moveX, 0f, moveZ);
-        nextPosition.x = Mathf.Clamp(nextPosition.x, -xLimit, xLimit);
+        ApplyBoundaryLimit();
+    }
 
-        // 4. 리지드바디 갱신
-        _rb.MovePosition(nextPosition);
-        _rb.rotation = Quaternion.identity;
+    private void OnApplicationQuit()
+    {
+        if (_isWheelInitialized)
+        {
+            LogitechGSDK.LogiStopSpringForce(0);
+            LogitechGSDK.LogiStopDamperForce(0);
+            LogitechGSDK.LogiSteeringShutdown();
+        }
     }
     #endregion
 
-    #region Helper Methods
-    public void SetMoveAction(bool value) { canMove = value; Debug.Log($"Change MoveState : {canMove}"); }
+    #region Input & Force Feedback Methods
+    private void UpdateLogitechState()
+    {
+        if (!useLogitechWheel || !_isWheelInitialized) return;
 
-    // [추가] 스킬 입력 처리 함수
+        if (LogitechGSDK.LogiUpdate() && LogitechGSDK.LogiIsConnected(0))
+        {
+            _isWheelConnected = true;
+            _currentState = LogitechGSDK.LogiGetStateUnity(0);
+        }
+        else
+        {
+            _isWheelConnected = false;
+        }
+    }
+
+    // 버튼 상태 저장 함수 (Update 끝에 호출)
+    private void UpdatePrevButtonStates()
+    {
+        if (!_isWheelConnected) return;
+        for (int i = 0; i < 128; i++)
+        {
+            _prevButtonStates[i] = (_currentState.rgbButtons[i] == 128);
+        }
+    }
+
+    private bool GetLogiButtonDown(int buttonIndex)
+    {
+        if (!_isWheelConnected) return false;
+
+        bool isPressedNow = _currentState.rgbButtons[buttonIndex] == 128;
+        bool wasPressedLastFrame = _prevButtonStates[buttonIndex];
+
+        // "지금 눌렀고" AND "아까는 안 눌렀었다" = 막 누른 순간
+        return isPressedNow && !wasPressedLastFrame;
+    }
+
+    private void HandleForceFeedback()
+    {
+        if (!_isWheelConnected) return;
+        LogitechGSDK.LogiPlaySpringForce(0, 0, 50, centeringSpringStrength);
+        LogitechGSDK.LogiPlayDamperForce(0, damperStrength);
+    }
+
+    private float GetCombinedHorizontalInput()
+    {
+        float keyboard = Input.GetAxis("Horizontal");
+        float wheel = 0f;
+
+        if (_isWheelConnected)
+        {
+            wheel = _currentState.lX / 32768f;
+            if (Mathf.Abs(wheel) < wheelDeadzone) wheel = 0f;
+        }
+        return Mathf.Clamp(keyboard + wheel, -1f, 1f);
+    }
+
+    private float GetCombinedVerticalInput()
+    {
+        float keyboard = Input.GetAxis("Vertical");
+        float pedals = 0f;
+
+        if (_isWheelConnected)
+        {
+            float rawAccel = _currentState.rglSlider[0];
+            float rawBrake = _currentState.lRz;
+
+            float accelVal = (32767f - rawAccel) / 65535f;
+            float brakeVal = (32767f - rawBrake) / 65535f;
+
+            if (accelVal < wheelDeadzone) accelVal = 0f;
+            if (brakeVal < wheelDeadzone) brakeVal = 0f;
+
+            pedals = accelVal - brakeVal;
+        }
+        return Mathf.Clamp(keyboard + pedals, -1f, 1f);
+    }
+    #endregion
+
+    #region Game Logic
+    public void SetMoveAction(bool value)
+    {
+        canMove = value;
+        if (!value)
+        {
+            _input = Vector2.zero;
+            if (_rb != null)
+            {
+                _rb.linearVelocity = Vector3.zero;
+                _rb.angularVelocity = Vector3.zero;
+            }
+        }
+    }
+
+    private void ApplyBoundaryLimit()
+    {
+        if (_rb.position.x < -xLimit && _rb.linearVelocity.x < 0)
+        {
+            Vector3 vel = _rb.linearVelocity; vel.x = 0; _rb.linearVelocity = vel;
+            _rb.position = new Vector3(-xLimit, _rb.position.y, _rb.position.z);
+        }
+        else if (_rb.position.x > xLimit && _rb.linearVelocity.x > 0)
+        {
+            Vector3 vel = _rb.linearVelocity; vel.x = 0; _rb.linearVelocity = vel;
+            _rb.position = new Vector3(xLimit, _rb.position.y, _rb.position.z);
+        }
+    }
+
     private void HandleSkillInput()
     {
         if (DataManager.Instance == null) return;
 
-        // --- 버프 스킬 (X 키) ---
-        if (Input.GetKeyDown(KeyCode.X))
+        // [모든 버튼 입력을 GetLogiButtonDown으로 변경]
+
+        // 버프 (Z or 11번)
+        if (Input.GetKeyDown(KeyCode.Z) || GetLogiButtonDown(11))
         {
-            // 1. 임계값(Max) 체크
-            // (DataManager의 maxCharge가 public이라고 가정합니다)
             if (DataManager.Instance.GetBuffer() >= DataManager.Instance.bufferUse)
             {
-                Debug.Log("[PlayerMover] Buff Skill Activated!");
-
-                // 2. 활성화 코드 (기능 구현부)
-                /*
-                 * 예: PlayerAttack.Instance.EnablePowerUp();
-                 */
-
-                // 3. 사용량 차감 (현재값 - Max값, 즉 0으로 초기화)
                 int cost = DataManager.Instance.bufferUse;
-                int remain = DataManager.Instance.GetBuffer() - cost;
-                DataManager.Instance.SetBuffer(Mathf.Max(0, remain));
-
-                // 4. 비네팅 효과 활성화 (UI Manager 연동) [cite: 2]
-                // (IngameUIManager에 해당 이벤트를 트리거하는 public 메서드가 필요합니다)
-                if (IngameUIManager.Instance != null)
-                {
-                    // IngameUIManager.Instance.HandleBufferAdded(); // 메서드 접근 제어자가 public이어야 함
-                    // 혹은 아래처럼 별도의 트리거 메서드를 만들어서 호출
-                    IngameUIManager.Instance.Log("Triggering Buff Vignette");
-                    // 기존 로직을 활용하기 위해 임시로 AddBuffer 이벤트를 활용하거나, 
-                    // IngameUIManager에 'TriggerBuffEffect()' Public 함수를 추가하여 호출해야 합니다.
-                    // 여기서는 DataManager의 SetBuffer가 UI 업데이트를 하겠지만, 
-                    // '스킬 사용 효과'를 위해 UI 매니저의 메서드를 직접 호출하는 것이 좋습니다.
-                }
-            }
-            else
-            {
-                Debug.Log("Not enough Buff charge!");
+                DataManager.Instance.SetBuffer(Mathf.Max(0, DataManager.Instance.GetBuffer() - cost));
+                if (IngameUIManager.Instance != null) IngameUIManager.Instance.Log("Buff Activated");
             }
         }
 
-        // --- 디버프 스킬 (C 키) ---
-        if (Input.GetKeyDown(KeyCode.C))
+        // 디버프 (X or 10번)
+        if (Input.GetKeyDown(KeyCode.X) || GetLogiButtonDown(10))
         {
-            // 1. 임계값(Max) 체크 [cite: 1]
             if (DataManager.Instance.GetDeBuffer() >= DataManager.Instance.debufferUse)
             {
-                Debug.Log("[PlayerMover] Debuff Skill Activated!");
-
-                // 2. 활성화 코드 (기능 구현부)
-                /* * [Active Code Here]
-                 * 예: EnemyManager.Instance.ApplySlowDown();
-                 */
-
-                // 3. 사용량 차감
                 int cost = DataManager.Instance.debufferUse;
-                int remain = DataManager.Instance.GetDeBuffer() - cost;
-                DataManager.Instance.SetDeBuffer(Mathf.Max(0, remain));
+                DataManager.Instance.SetDeBuffer(Mathf.Max(0, DataManager.Instance.GetDeBuffer() - cost));
+                if (IngameUIManager.Instance != null) IngameUIManager.Instance.Log("Debuff Activated");
+            }
+        }
 
-                // 4. 비네팅 효과 활성화
-                if (IngameUIManager.Instance != null)
+        // 일시정지 (C or L2/7번)
+        if (Input.GetKeyDown(KeyCode.C) || GetLogiButtonDown(7))
+        {
+            if (IngameUIManager.Instance != null)
+            {
+                // 패널이 닫혀있으면 -> 일시정지 (열기)
+                if (!IngameUIManager.Instance.GetDisplayPanel())
                 {
-                    IngameUIManager.Instance.Log("Triggering Debuff Vignette");
-                    // IngameUIManager.Instance.TriggerDeBuffEffect(); // Public 메서드 필요
+                    IngameUIManager.Instance.OnClickPauseButton();
+                }
+                // 패널이 열려있으면 -> 상황에 맞게 닫기 (계속하기/홈으로 등)
+                else
+                {
+                    if (GameManager.Instance.IsPaused) IngameUIManager.Instance.OnClickContinueButton();
+                    else if (GameManager.Instance.IsFailed) IngameUIManager.Instance.OnClickRetryButton();
+                    else if (outtroUIManager != null) outtroUIManager.GoHome();
                 }
             }
-            else
+        }
+
+        // 뒤로가기 (B or R2/6번)
+        if (Input.GetKeyDown(KeyCode.B) || GetLogiButtonDown(6))
+        {
+            if (IngameUIManager.Instance != null && IngameUIManager.Instance.GetDisplayPanel())
             {
-                Debug.Log("Not enough Debuff charge!");
+                if (GameManager.Instance.IsPaused || GameManager.Instance.IsFailed) IngameUIManager.Instance.OnClickBackButton();
             }
         }
     }
 
-    private void HandleInputLogging(float h, float v)
+    private void CheckGameOver()
     {
-        float threshold = 0.1f;
-
-        // Forward
-        if (v > threshold)
+        if (DataManager.Instance != null && IngameUIManager.Instance != null)
         {
-            if (!_loggedForward)
+            if (DataManager.Instance.GetShipHealth() <= 0 && !IngameUIManager.Instance.GetDisplayPanel())
             {
-                Debug.Log("Forward Input (W) Started");
-                IngameUIManager.Instance.CloseArrowPanel();
-                IngameUIManager.Instance.OpenArrowPanel(1);
-                _loggedForward = true;
+                IngameUIManager.Instance.OnClickFailButton();
             }
-        }
-        else _loggedForward = false;
-
-        // Backward
-        if (v < -threshold)
-        {
-            if (!_loggedBackward)
-            {
-                Debug.Log("Backward Input (S) Started");
-                IngameUIManager.Instance.CloseArrowPanel();
-                _loggedBackward = true;
-            }
-        }
-        else _loggedBackward = false;
-
-        // Left
-        if (h < -threshold)
-        {
-            if (!_loggedLeft)
-            {
-                Debug.Log("Left Input (A) Started");
-                IngameUIManager.Instance.CloseArrowPanel();
-                IngameUIManager.Instance.OpenArrowPanel(2);
-                _loggedLeft = true;
-            }
-        }
-        else _loggedLeft = false;
-
-        // Right
-        if (h > threshold)
-        {
-            if (!_loggedRight)
-            {
-                Debug.Log("Right Input (D) Started");
-                IngameUIManager.Instance.CloseArrowPanel();
-                IngameUIManager.Instance.OpenArrowPanel(3);
-                _loggedRight = true;
-            }
-        }
-        else _loggedRight = false;
-    }
-
-    public void SetControlState(bool state)
-    {
-        canMove = state;
-        if (!state)
-        {
-            _currentForwardSpeed = 0f;
-            _input = Vector2.zero;
         }
     }
 
@@ -269,9 +360,7 @@ public class PlayerMover : MonoBehaviour
     {
         if (shieldEffect != null) shieldEffect.SetActive(false);
     }
-    #endregion
 
-    #region Collision Handling
     private void OnTriggerEnter(Collider other)
     {
         if (other.CompareTag("Obstacle"))
