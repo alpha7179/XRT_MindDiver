@@ -18,7 +18,7 @@ public class Target : MonoBehaviour
                 // 현재 페이즈 매니저에 알림 (킬 카운트 증가용)
                 FindAnyObjectByType<GamePhaseManager>()?.OnEnemyKilled();
 
-                AudioManager.Instance.PlaySFX("Splat");
+                AudioManager.Instance.PlaySFX(SFXType.ItemCollect);
 
                 // 파티클 효과 생성 (생략 가능)
                 Destroy(gameObject);
@@ -27,14 +27,14 @@ public class Target : MonoBehaviour
             case TargetType.SmallRock:
                 DataManager.Instance.AddScore(50);
                 FindAnyObjectByType<GamePhaseManager>()?.OnEnemyKilled();
-                AudioManager.Instance.PlaySFX("Explode");
+                AudioManager.Instance.PlaySFX(SFXType.Explosion);
                 Destroy(gameObject);
                 break;
 
             case TargetType.LargeRock:
                 // 거대 암석은 포수가 파괴 불가 (혹은 여러 번 터치해야 함)
                 // 여기서는 파괴 불가로 설정 (피드백만 재생)
-                AudioManager.Instance.PlaySFX("ShieldHit"); // 팅겨내는 소리
+                AudioManager.Instance.PlaySFX(SFXType.ShieldHit); // 팅겨내는 소리
                 break;
 
             case TargetType.BossWeakpoint:
