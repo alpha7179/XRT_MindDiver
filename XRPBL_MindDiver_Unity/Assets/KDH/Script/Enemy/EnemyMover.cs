@@ -28,6 +28,11 @@ public class EnemyMover : MonoBehaviour
 
     public bool printDebug = false;
 
+    // 디버프 여부
+    public bool isDebuffed;
+    private float commonMS;
+    private float commonTCI;
+
 
     // 추적 기준이 되는 카메라 (3개 중 전방 카메라 하나만 지정해도 충분합니다)
     public Transform primaryCamera;
@@ -147,8 +152,22 @@ public class EnemyMover : MonoBehaviour
             }
         }
 
-        // 목표 위치 갱신 타이머
-        timer -= Time.deltaTime;
+        //// 디버프 구현------------------------
+        //commonMS = movementSpeed;
+        //commonTCI = targetChangeInterval;
+        //if (DataManger.Instance.GetDebuffState())
+        //{
+        //    movementSpeed /= 2;
+        //    targetChangeInterval *= 2;
+        //}
+        //else
+        //{
+        //    movementSpeed = commonMS;
+        //    targetChangeInterval = commonTCI;
+        //}
+
+            // 목표 위치 갱신 타이머
+            timer -= Time.deltaTime;
         if (timer <= 0f)
         {
             // 로컬 목표 위치 갱신 (플레이어 데미지 여기에)
@@ -302,4 +321,12 @@ public class EnemyMover : MonoBehaviour
         }
         Debug.Log("- ScreenRight : " + ScreenRight);
     }
+
+    // 디버프 발동 시 호출 (사용X)
+    //public void Debuffed()
+    //{
+    //    movementSpeed /= 2;
+    //    targetChangeInterval *= 2;
+    //    EnemyHealth.currentHealth
+    //}
 }
