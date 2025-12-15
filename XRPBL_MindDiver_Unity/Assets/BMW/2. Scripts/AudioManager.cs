@@ -1,10 +1,23 @@
-using System.Collections; //  코루틴 사용을 위해 필요
+using System.Collections;
 using UnityEngine;
-using static GameManager;
-using static GamePhaseManager;
+using static GameManager;     // GameState 사용
+using static GamePhaseManager; // Phase 사용
 
 /// <summary>
-/// 게임 내 배경음악(BGM)과 효과음(SFX) 재생을 총괄하는 오디오 관리 클래스
+/// 효과음 종류 정의 (문자열 오타 방지용)
+/// </summary>
+public enum SFXType
+{
+    Touch,
+    Explosion,
+    ShieldHit,
+    ItemCollect,
+    None
+}
+
+/// <summary>
+/// 게임 내 오디오(BGM, SFX)를 총괄 관리하는 클래스
+/// - 수정됨: 실시간 볼륨 조절 기능 추가 (Update 루프 활용)
 /// </summary>
 public class AudioManager : MonoBehaviour
 {
@@ -14,49 +27,35 @@ public class AudioManager : MonoBehaviour
 
     #region Inspector Fields
     [Header("Audio Sources")]
-    // 배경음악 재생용 오디오 소스
     public AudioSource bgmSource;
-    // 효과음 재생용 오디오 소스
     public AudioSource sfxSource;
 
     [Header("BGM Clips")]
-    // 메인 메뉴 배경음악
     public AudioClip bgm_MainMenu;
-    // 캐릭터 선택 화면 배경음악
     public AudioClip bgm_CharacterSelect;
-    // 프리페이즈 배경음악
     public AudioClip bgm_PrePhase;
-    // 페이즈 1 배경음악
     public AudioClip bgm_Phase1;
-    // 페이즈 2 배경음악
     public AudioClip bgm_Phase2;
-    // 페이즈 3 배경음악
     public AudioClip bgm_Phase3;
-    // 결과 화면 배경음악
     public AudioClip bgm_Result;
 
     [Header("SFX Clips")]
-    // 터치 효과음
     public AudioClip sfx_Touch;
-    // 폭발 효과음
     public AudioClip sfx_Explosion;
-    // 쉴드 피격 효과음
     public AudioClip sfx_ShieldHit;
-    // 아이템 획득 효과음
     public AudioClip sfx_ItemCollect;
+
+    [Header("Settings")]
+    [Tooltip("BGM이 전환될 때 페이드 아웃/인 되는 시간")]
+    [SerializeField] private float bgmTransitionTime = 1.0f;
     #endregion
 
     #region Private Fields
-    //  BGM 초기 볼륨 기억용 변수
-    private float _initialBgmVolume = 1f;
-    //  현재 실행 중인 페이드 코루틴 저장용
-    private Coroutine _bgmFadeCoroutine;
+    // 현재 실행 중인 BGM 전환/페이드 코루틴 (null이면 페이드 중이 아님)
+    private Coroutine _bgmCoroutine;
     #endregion
 
     #region Unity Lifecycle
-    /*
-     * 싱글톤 인스턴스 초기화 및 파괴 방지 설정 수행
-     */
     private void Awake()
     {
         if (Instance == null)
@@ -64,147 +63,217 @@ public class AudioManager : MonoBehaviour
             Instance = this;
             transform.parent = null;
             DontDestroyOnLoad(gameObject);
-
-            //  시작할 때 설정된 BGM 볼륨 저장 (나중에 페이드 아웃 후 복구할 때 사용)
-            if (bgmSource != null) _initialBgmVolume = bgmSource.volume;
         }
         else
         {
             Destroy(gameObject);
         }
     }
+
+    // [추가됨] 실시간 볼륨 동기화를 위한 Update 로직
+    private void Update()
+    {
+        if (DataManager.Instance == null) return;
+
+        // 1. BGM 볼륨 실시간 동기화
+        // 중요: 페이드 인/아웃(코루틴)이 진행 중일 때는 볼륨을 건드리지 않아야 자연스러운 전환이 유지됩니다.
+        if (_bgmCoroutine == null && bgmSource.isPlaying)
+        {
+            bgmSource.volume = GetSavedBGMVolume();
+        }
+
+        // 2. SFX 볼륨 실시간 동기화
+        // SFX는 보통 OneShot으로 재생되지만, Source의 볼륨을 바꾸면 전체 크기에 영향을 줍니다.
+        sfxSource.volume = (float)DataManager.Instance.GetSFXVolume() / 100f;
+    }
     #endregion
 
-    #region Public Methods - BGM
-    /*
-     * 특정 오디오 클립으로 BGM 재생 (중복 재생 방지)
-     */
+    #region Public Methods - BGM Logic
+
+    /// <summary>
+    /// BGM을 재생합니다. (페이드 효과 자동 적용)
+    /// </summary>
     public void PlayBGM(AudioClip clip)
     {
-        if (bgmSource.clip == clip && bgmSource.isPlaying) return;
+        // 1. 이미 같은 곡이 재생 중이고, 잘 나오고 있다면 무시
+        if (bgmSource.clip == clip && bgmSource.isPlaying && _bgmCoroutine == null) return;
 
-        // 페이드 아웃 중에 다른 BGM을 틀어야 한다면, 페이드 중지 후 볼륨 복구
-        if (_bgmFadeCoroutine != null) StopCoroutine(_bgmFadeCoroutine);
-        bgmSource.volume = _initialBgmVolume;
+        // 2. 이전 전환 작업이 진행 중이라면 중단
+        if (_bgmCoroutine != null) StopCoroutine(_bgmCoroutine);
 
-        bgmSource.Stop();
-        bgmSource.clip = clip;
-        bgmSource.volume = (float)DataManager.Instance.GetBGMVolume()/100;
-        bgmSource.Play();
+        // 3. 부드러운 전환 시작 (Fade Out -> Swap -> Fade In)
+        _bgmCoroutine = StartCoroutine(ChangeBGMRoutine(clip, bgmTransitionTime));
     }
 
-    /*
-     * 게임 상태 및 페이즈에 따른 BGM 자동 재생
-     */
+    /// <summary>
+    /// 게임 상태에 따라 적절한 BGM을 자동으로 재생합니다.
+    /// </summary>
     public void PlayBGM(GameState gameState, Phase phaseState = Phase.Null)
     {
+        AudioClip targetClip = null;
+
         switch (gameState)
         {
-            case GameState.MainMenu:
-                if (bgm_MainMenu != null) PlayBGM(bgm_MainMenu);
-                break;
-            case GameState.CharacterSelect:
-                if (bgm_CharacterSelect != null) PlayBGM(bgm_CharacterSelect);
-                break;
+            case GameState.MainMenu: targetClip = bgm_MainMenu; break;
+            case GameState.CharacterSelect: targetClip = bgm_CharacterSelect; break;
+            case GameState.Result: targetClip = bgm_Result; break;
             case GameState.GameStage:
                 switch (phaseState)
                 {
-                    case Phase.PrePhase: if (bgm_PrePhase != null) PlayBGM(bgm_PrePhase); break;
-                    case Phase.Phase1: if (bgm_Phase1 != null) PlayBGM(bgm_Phase1); break;
-                    case Phase.Phase2: if (bgm_Phase2 != null) PlayBGM(bgm_Phase2); break;
-                    case Phase.Phase3: if (bgm_Phase3 != null) PlayBGM(bgm_Phase3); break;
+                    case Phase.PrePhase: targetClip = bgm_PrePhase; break;
+                    case Phase.Phase1: targetClip = bgm_Phase1; break;
+                    case Phase.Phase2: targetClip = bgm_Phase2; break;
+                    case Phase.Phase3: targetClip = bgm_Phase3; break;
                 }
                 break;
-            case GameState.Result:
-                if (bgm_Result != null) PlayBGM(bgm_Result);
-                break;
+        }
+
+        if (targetClip != null)
+        {
+            PlayBGM(targetClip);
         }
     }
 
     /// <summary>
-    /// [수정됨] 현재 재생 중인 배경음악(BGM)을 페이드 아웃하며 정지합니다.
+    /// BGM을 서서히 멈춥니다.
     /// </summary>
-    /// <param name="fadeDuration">페이드 아웃에 걸리는 시간 (초)</param>
     public void StopBGM(float fadeDuration = 1.0f)
     {
-        if (bgmSource != null && bgmSource.isPlaying)
-        {
-            // 기존 페이드 코루틴이 있다면 중지
-            if (_bgmFadeCoroutine != null) StopCoroutine(_bgmFadeCoroutine);
-
-            // 페이드 아웃 시작
-            _bgmFadeCoroutine = StartCoroutine(FadeOutRoutine(fadeDuration));
-        }
+        if (_bgmCoroutine != null) StopCoroutine(_bgmCoroutine);
+        _bgmCoroutine = StartCoroutine(FadeOutAndStopRoutine(fadeDuration));
     }
 
-    //  서서히 볼륨을 줄이는 코루틴
-    private IEnumerator FadeOutRoutine(float duration)
-    {
-        float startVolume = bgmSource.volume;
-        float timer = 0f;
-
-        while (timer < duration)
-        {
-            timer += Time.deltaTime;
-            // 시간에 따라 볼륨을 줄임 (Lerp)
-            bgmSource.volume = Mathf.Lerp(startVolume, 0f, timer / duration);
-            yield return null;
-        }
-
-        // 완전히 0으로 만든 후 정지
-        bgmSource.volume = 0f;
-        bgmSource.Stop();
-
-        // 다음 재생을 위해 볼륨 원상복구 (미리 해둠)
-        bgmSource.volume = _initialBgmVolume;
-        _bgmFadeCoroutine = null;
-    }
     #endregion
 
-    #region Public Methods - SFX
-    /*
-     * 특정 오디오 클립을 효과음으로 1회 재생
-     */
+    #region Private Methods - BGM Coroutines
+
+    // [핵심 개선] BGM 교체 시 페이드 아웃 -> 교체 -> 페이드 인 처리
+    private IEnumerator ChangeBGMRoutine(AudioClip nextClip, float duration)
+    {
+        float targetVolume = GetSavedBGMVolume();
+        float halfDuration = duration * 0.5f;
+
+        // 1. 재생 중이라면 페이드 아웃
+        if (bgmSource.isPlaying && bgmSource.volume > 0)
+        {
+            float startVol = bgmSource.volume;
+            float timer = 0f;
+
+            while (timer < halfDuration)
+            {
+                timer += Time.deltaTime;
+                // 여기서는 실시간 볼륨보다 페이드 효과가 우선됩니다.
+                bgmSource.volume = Mathf.Lerp(startVol, 0f, timer / halfDuration);
+                yield return null;
+            }
+            bgmSource.volume = 0f;
+            bgmSource.Stop();
+        }
+
+        // 2. 클립 교체 및 재생 시작
+        bgmSource.clip = nextClip;
+        bgmSource.Play();
+
+        // 3. 페이드 인
+        // 페이드 인을 시작할 때 최신 볼륨값을 다시 가져옵니다.
+        targetVolume = GetSavedBGMVolume();
+
+        if (targetVolume > 0)
+        {
+            float timer = 0f;
+            while (timer < halfDuration)
+            {
+                timer += Time.deltaTime;
+                bgmSource.volume = Mathf.Lerp(0f, targetVolume, timer / halfDuration);
+                yield return null;
+            }
+        }
+
+        // 최종 볼륨 확정 후 코루틴 종료 표시 (null)
+        // 이 시점부터 Update문에서 실시간 볼륨 조절이 활성화됩니다.
+        bgmSource.volume = targetVolume;
+        _bgmCoroutine = null;
+    }
+
+    private IEnumerator FadeOutAndStopRoutine(float duration)
+    {
+        if (bgmSource.isPlaying)
+        {
+            float startVol = bgmSource.volume;
+            float timer = 0f;
+
+            while (timer < duration)
+            {
+                timer += Time.deltaTime;
+                bgmSource.volume = Mathf.Lerp(startVol, 0f, timer / duration);
+                yield return null;
+            }
+        }
+
+        bgmSource.volume = 0f;
+        bgmSource.Stop();
+        _bgmCoroutine = null;
+    }
+
+    // DataManager에서 현재 BGM 볼륨(0~1) 가져오기
+    private float GetSavedBGMVolume()
+    {
+        if (DataManager.Instance != null)
+            return (float)DataManager.Instance.GetBGMVolume() / 100f;
+        return 1f; // 기본값
+    }
+
+    #endregion
+
+    #region Public Methods - SFX Logic (Enum Improved)
+
+    public void PlaySFX(SFXType type)
+    {
+        AudioClip clipToPlay = null;
+
+        switch (type)
+        {
+            case SFXType.Touch: clipToPlay = sfx_Touch; break;
+            case SFXType.Explosion: clipToPlay = sfx_Explosion; break;
+            case SFXType.ShieldHit: clipToPlay = sfx_ShieldHit; break;
+            case SFXType.ItemCollect: clipToPlay = sfx_ItemCollect; break;
+        }
+
+        if (clipToPlay != null)
+        {
+            PlaySFX(clipToPlay);
+        }
+        else
+        {
+            if (type != SFXType.None)
+                Debug.LogWarning($"[AudioManager] SFX Clip is missing for type: {type}");
+        }
+    }
+
     public void PlaySFX(AudioClip clip)
     {
-        sfxSource.volume = (float)DataManager.Instance.GetSFXVolume() / 100;
+        // PlayOneShot은 Source의 Volume 설정을 따라가므로 
+        // 여기서 굳이 volume을 세팅하지 않아도 Update에서 처리됩니다.
+        // 하지만 즉시 반응성을 위해 남겨둡니다.
+        float sfxVol = 1f;
+        if (DataManager.Instance != null)
+            sfxVol = (float)DataManager.Instance.GetSFXVolume() / 100f;
+
+        sfxSource.volume = sfxVol;
         sfxSource.PlayOneShot(clip);
     }
 
-    /*
-     * 문자열 키워드를 통한 효과음 재생 (편의성 제공)
-     */
-    public void PlaySFX(string sfxName)
-    {
-        switch (sfxName)
-        {
-            case "Touch": PlaySFX(sfx_Touch); break;
-            case "Explosion": PlaySFX(sfx_Explosion); break;
-            case "ShieldHit": PlaySFX(sfx_ShieldHit); break;
-            case "Collect": PlaySFX(sfx_ItemCollect); break;
-        }
-    }
-
-    /// <summary>
-    /// [추가됨] 현재 재생 중인 모든 효과음(SFX)을 즉시 정지합니다.
-    /// 주의: PlayOneShot으로 재생 중인 모든 소리가 함께 끊깁니다.
-    /// </summary>
     public void StopSFX()
     {
-        if (sfxSource != null)
-        {
-            sfxSource.Stop();
-        }
+        if (sfxSource != null) sfxSource.Stop();
     }
+
     #endregion
 
-    #region Public Methods - All
-    /// <summary>
-    /// [추가됨] BGM과 SFX를 모두 정지합니다.
-    /// </summary>
+    #region Public Methods - All control
     public void StopAllAudio()
     {
-        StopBGM(0.5f); // 전체 정지 시에는 조금 더 빨리(0.5초) 꺼지도록 설정
+        StopBGM(0.5f);
         StopSFX();
     }
     #endregion
