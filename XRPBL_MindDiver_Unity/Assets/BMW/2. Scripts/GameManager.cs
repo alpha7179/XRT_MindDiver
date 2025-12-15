@@ -78,6 +78,12 @@ public class GameManager : MonoBehaviour
         }
     }
 
+    private void Start()
+    {
+        currentState =  GameState.MainMenu;
+        AudioManager.Instance.PlayBGM(currentState);
+    }
+
     /*
      * 씬 로드 이벤트 구독 등록
      */
