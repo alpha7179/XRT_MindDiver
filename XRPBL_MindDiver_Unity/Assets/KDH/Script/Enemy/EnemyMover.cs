@@ -9,10 +9,11 @@ public class EnemyMover : MonoBehaviour
     public float maxDistance = 2000f; // 플레이어로부터 최대 거리
     //public float flightHeight = 0f; // 플레이어 기준 수직 높이 오프셋
     // [수정] 고정 높이 대신 높이 범위 설정
-    public float minFlightHeight = -200f; // 카메라를 기준으로 최소 높이
+    public float minFlightHeight = -600f; // 카메라를 기준으로 최소 높이
     public float maxFlightHeight = 180f; // 카메라를 기준으로 최대 높이
     // 90도(오른쪽)와 270도(왼쪽)를 중심으로 허용되는 각도 범위 (예: 30이면 60~120도, 240~300도 허용)
     public float sectorAngleRange = 40f;
+    private float addition = 1f;
 
     [Header("이동 및 불규칙성")]
     public float movementSpeed = 2f; // 목표 지점으로 이동하는 속도
@@ -154,10 +155,9 @@ public class EnemyMover : MonoBehaviour
         if (timer <= 0f)
         {
             // 로컬 목표 위치 갱신 (플레이어 데미지 여기에)
-            DataManager.Instance.TakeDamage(enemydamage);
-
             currentLocalTargetPosition = GetNewLocalTargetPosition(ScreenRight);
             timer = targetChangeInterval;
+            DataManager.Instance.TakeDamage(enemydamage);
         }
 
         // 로컬 위치를 월드 위치로 변환
@@ -225,29 +225,29 @@ public class EnemyMover : MonoBehaviour
     /// </summary>
     private Vector3 GetNewLocalTargetPosition(bool ScreenDirection)
     {
-        // 1. 랜덤 각도 및 거리 생성
+        // 랜덤 각도 및 거리 생성
         float angle;
         // true가 오른쪽
         if (ScreenDirection == true)
         {
             // 오른쪽 섹터: 90도 ± sectorAngleRange
-            angle = 90f + Random.Range(-sectorAngleRange, sectorAngleRange);
+            angle = 90f + Random.Range(-sectorAngleRange, sectorAngleRange - 5f);
 
         }
         else
         {
             // 왼쪽 섹터: 270도 ± sectorAngleRange
-            angle = 270f + Random.Range(-sectorAngleRange, sectorAngleRange);
+            angle = 270f + Random.Range(-sectorAngleRange + 5f, sectorAngleRange);
             // 각도를 -180 ~ 180 범위로 조정
             if (angle > 360f) angle -= 360f;
         }
 
         float distance = Random.Range(minDistance, maxDistance);
 
-        // 2. 수직 높이 랜덤 생성 (새로운 로직!)
+        // 수직 높이 랜덤 생성
         float randomHeight = Random.Range(minFlightHeight, maxFlightHeight);
 
-        // 3. 로컬 위치 계산
+        // 로컬 위치 계산
         // Quaternion.Euler(0, angle, 0)은 카메라의 로컬 Y축(위쪽)을 기준으로 회전합니다.
         Quaternion rotation = Quaternion.Euler(0, angle, 0);
 
@@ -255,7 +255,14 @@ public class EnemyMover : MonoBehaviour
         Vector3 horizontalDirection = rotation * Vector3.forward;
 
         // 로컬 XZ 평면 위치 계산
-        Vector3 localXZPosition = horizontalDirection * distance;
+        if(angle >= 35) {
+            addition = 1.3f;
+        }
+        else
+        {
+            addition = 1f;
+        }
+        Vector3 localXZPosition = horizontalDirection * distance * addition;
 
         // 수직 오프셋을 더해 최종 로컬 목표 위치를 반환합니다.
         return localXZPosition + Vector3.up * randomHeight;
