@@ -72,6 +72,14 @@ public class MeshCore : MonoBehaviour
     // 오브젝트 처치 시 로직
     private void Die()
     {
+        // [방어 코드 추가] 프리팹이 연결되어 있지 않다면 에러 로그를 띄우고 생성 로직을 건너뜁니다.
+        if (Prefab == null)
+        {
+            Debug.LogError("MeshCore: 'Prefab' 변수가 비어있습니다! 인스펙터에서 프리팹을 할당해주세요.");
+            Destroy(gameObject); // 생성은 못하더라도 현재 오브젝트는 파괴
+            return;
+        }
+
         for (int i = 0; i < spawnNum; i++)
         {
             SpawnNewEntity();

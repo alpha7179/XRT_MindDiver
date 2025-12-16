@@ -5,9 +5,8 @@ using System.Collections;
 using System.Collections.Generic;
 
 /// <summary>
-/// 캐릭터 선택 화면 매니저 (최종_Ver_FadeIn)
-/// - 기능: 토글 입력, 3초 대기, 연속 클릭 방지, 클립 개수 자동 인식
-/// - 추가: 영상 시작 시 부드러운 페이드인 효과 적용
+/// 캐릭터 선택 화면 매니저 (최종_Ver_SoundAdded)
+/// - 수정됨: 버튼 클릭 시 SFX 추가
 /// </summary>
 public class CharacterSelectManager : MonoBehaviour
 {
@@ -38,7 +37,7 @@ public class CharacterSelectManager : MonoBehaviour
     [SerializeField] private float textFadeDuration = 0.2f;
 
     [Tooltip("영상이 나타날 때(페이드인) 걸리는 시간")]
-    [SerializeField] private float videoFadeDuration = 1.5f; // 영상은 좀 더 천천히 뜨도록 설정
+    [SerializeField] private float videoFadeDuration = 1.5f;
 
     [Header("Audio Settings")]
     [Range(0f, 1f)] public float masterVolume = 1.0f;
@@ -69,11 +68,9 @@ public class CharacterSelectManager : MonoBehaviour
             {
                 if (panel)
                 {
-                    // CanvasGroup이 없으면 추가하고, Alpha를 0으로 강제 설정
                     CanvasGroup cg = panel.GetComponent<CanvasGroup>();
                     if (cg == null) cg = panel.AddComponent<CanvasGroup>();
                     cg.alpha = 0f;
-
                     panel.SetActive(false);
                 }
             }
@@ -107,6 +104,15 @@ public class CharacterSelectManager : MonoBehaviour
     public void OnPointerDownLeft() { ProcessInput(1, leftButtonText); }
     public void OnPointerDownRight() { ProcessInput(2, rightButtonText); }
 
+    // [추가] 사운드 재생 헬퍼
+    private void PlayUISound(SFXType type)
+    {
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlaySFX(type);
+        }
+    }
+
     private void ProcessInput(int index, GameObject textObj)
     {
         if (isVideoPlayed) return;
@@ -116,6 +122,9 @@ public class CharacterSelectManager : MonoBehaviour
             Log($"[Input Ignored] Clicked too fast. (Cooldown: {clickCooldown}s)");
             return;
         }
+
+        // [추가] 버튼 클릭 효과음
+        PlayUISound(SFXType.UI_Touch);
 
         lastClickTime = Time.time;
         isButtonActive[index] = !isButtonActive[index];
@@ -212,7 +221,6 @@ public class CharacterSelectManager : MonoBehaviour
             {
                 if (i < targetLoopCount)
                 {
-                    // ★ 여기서 비디오 전용 시간(videoFadeDuration)을 사용하여 부드럽게 켭니다.
                     FadePanel(videoPanels[i], true, videoFadeDuration);
                 }
                 else
@@ -267,9 +275,6 @@ public class CharacterSelectManager : MonoBehaviour
 
     #region Helper Methods (Fade & Validations)
 
-    /// <summary>
-    /// 페이드 효과 적용 (duration 매개변수 추가됨)
-    /// </summary>
     private void FadePanel(GameObject panel, bool show, float duration)
     {
         if (panel == null) return;
@@ -296,7 +301,6 @@ public class CharacterSelectManager : MonoBehaviour
         while (elapsed < duration)
         {
             elapsed += Time.deltaTime;
-            // 부드러운 전환을 위해 Lerp 사용
             cg.alpha = Mathf.Lerp(startAlpha, targetAlpha, elapsed / duration);
             yield return null;
         }

@@ -84,6 +84,7 @@ public class GamePhaseManager : MonoBehaviour
     {
         // PrePhase Ω√¿€
         StartPhase(Phase.PrePhase);
+        if (AudioManager.Instance != null && GameManager.Instance != null) AudioManager.Instance.PlayBGM(GameManager.GameState.GameStage, Phase.PrePhase);
 
         if (PlayerMover.Instance != null) PlayerMover.Instance.SetMoveAction(false);
 
@@ -177,8 +178,8 @@ public class GamePhaseManager : MonoBehaviour
         _phaseKillCount = 0;
 
         Log($"[GamePhaseManager] Start Phase: {phase}");
-        if (AudioManager.Instance != null) AudioManager.Instance.StopBGM();
-        if (AudioManager.Instance != null && GameManager.Instance != null) AudioManager.Instance.PlayBGM(GameManager.Instance.currentState, currentPhase);
+        //if (AudioManager.Instance != null) AudioManager.Instance.StopBGM();
+        //if (AudioManager.Instance != null && GameManager.Instance != null) AudioManager.Instance.PlayBGM(GameManager.GameState.GameStage, currentPhase);
 
         switch (phase)
         {
