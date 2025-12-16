@@ -9,6 +9,7 @@ using static GamePhaseManager;
 
 /// <summary>
 /// 게임 시작 화면(인트로 및 메인 메뉴)의 UI 상호작용 및 패널 전환을 관리하는 클래스
+/// - 수정됨: 버튼 클릭 시 SFX 재생 기능 추가
 /// </summary>
 public class IntroUIManager : MonoBehaviour
 {
@@ -78,7 +79,7 @@ public class IntroUIManager : MonoBehaviour
     private int currentActiveMainPanel;
     // 현재 활성화된 장소 패널 추적
     private int currentPlacePanel;
-    private string currentPhaseName = null ;
+    private string currentPhaseName = null;
 
     // 현재 BGM 볼륨 값
     private int BGMValue;
@@ -103,28 +104,32 @@ public class IntroUIManager : MonoBehaviour
         BGMSlider.maxValue = 100;
         BGMSlider.wholeNumbers = true;
 
-        UpdateBGMVolume(DataManager.Instance.GetBGMVolume());
+        if (DataManager.Instance != null)
+            UpdateBGMVolume(DataManager.Instance.GetBGMVolume());
 
         // SFX 슬라이더 설정 및 이벤트 리스너 등록
         SFXSlider.minValue = 0;
         SFXSlider.maxValue = 100;
         SFXSlider.wholeNumbers = true;
 
-        UpdateSFXVolume(DataManager.Instance.GetSFXVolume());
+        if (DataManager.Instance != null)
+            UpdateSFXVolume(DataManager.Instance.GetSFXVolume());
 
         // Video 슬라이더 설정 및 이벤트 리스너 등록
         VideoSlider.minValue = 0;
         VideoSlider.maxValue = 100;
         VideoSlider.wholeNumbers = true;
 
-        UpdateVideoVolume(DataManager.Instance.GetVideoVolume());
+        if (DataManager.Instance != null)
+            UpdateVideoVolume(DataManager.Instance.GetVideoVolume());
 
         // NAR 슬라이더 설정 및 이벤트 리스너 등록
         NARSlider.minValue = 0;
         NARSlider.maxValue = 100;
         NARSlider.wholeNumbers = true;
 
-        UpdateNARVolume(DataManager.Instance.GetNARVolume());
+        if (DataManager.Instance != null)
+            UpdateNARVolume(DataManager.Instance.GetNARVolume());
 
         // 하위 패널 비활성화 초기화
         if (placePanel)
@@ -163,7 +168,7 @@ public class IntroUIManager : MonoBehaviour
             foreach (var panel in fadePanel) { if (panel) FadePanel(panel, true); }
         }
 
-        FadePanel(panelToActivate,true);
+        FadePanel(panelToActivate, true);
         currentTopPanel = panelToActivate;
     }
 
@@ -216,12 +221,23 @@ public class IntroUIManager : MonoBehaviour
     }
     #endregion
 
-    #region Button Event Handlers
+    #region Button Event Handlers (With Sounds)
+
+    // [추가] 사운드 재생 헬퍼 메서드
+    private void PlayUISound(SFXType type)
+    {
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlaySFX(type);
+        }
+    }
+
     /*
      * 인트로 화면 클릭 시 메인 메뉴(장소 선택)로 진입 처리
      */
     public void OnClickIntroButton()
     {
+        PlayUISound(SFXType.UI_Touch); // [추가]
         Log("IntroButton Clicked");
         SwitchTopPanel(choicePanel);
 
@@ -234,6 +250,7 @@ public class IntroUIManager : MonoBehaviour
      */
     public void OnClickPlaceButton()
     {
+        PlayUISound(SFXType.UI_Touch); // [추가]
         Log("PlaceButton Clicked");
         SwitchMainPanel(placePanel, 0);
     }
@@ -243,6 +260,7 @@ public class IntroUIManager : MonoBehaviour
      */
     public void OnClickManualButton()
     {
+        PlayUISound(SFXType.UI_Touch); // [추가]
         Log("ManualButton Clicked");
         SwitchMainPanel(manualPanel, 1);
     }
@@ -252,6 +270,7 @@ public class IntroUIManager : MonoBehaviour
      */
     public void OnClickSettingButton()
     {
+        PlayUISound(SFXType.UI_Touch); // [추가]
         Log("SettingButton Clicked");
         SwitchMainPanel(settingPanel, 2);
     }
@@ -261,24 +280,28 @@ public class IntroUIManager : MonoBehaviour
      */
     public void OnClickEndButton()
     {
+        PlayUISound(SFXType.UI_Touch); // [추가]
         Log("EndButton Clicked");
         SwitchMainPanel(endPanel, 3);
     }
 
     public void OnClickPhase1Button()
     {
+        PlayUISound(SFXType.UI_Touch); // [추가]
         Log("Phase1Button Clicked");
         currentPhaseName = "Phase1";
         SwitchPlacePanel(0);
     }
     public void OnClickPhase2Button()
     {
+        PlayUISound(SFXType.UI_Touch); // [추가]
         Log("Phase2Button Clicked");
         currentPhaseName = "Phase2";
         SwitchPlacePanel(1);
     }
     public void OnClickPhase3Button()
     {
+        PlayUISound(SFXType.UI_Touch); // [추가]
         Log("Phase3Button Clicked");
         currentPhaseName = "Phase3";
         SwitchPlacePanel(2);
@@ -289,6 +312,7 @@ public class IntroUIManager : MonoBehaviour
      */
     public void OnClickQuitButton()
     {
+        PlayUISound(SFXType.UI_Touch); // [추가]
         Log("QuitButton Clicked");
         GameManager.Instance.QuitGame();
     }
@@ -298,13 +322,21 @@ public class IntroUIManager : MonoBehaviour
      */
     public void OnClickPlayButton()
     {
+        // Phase1이 아니면 반응하지 않음 (소리도 안 남)
         if (currentPhaseName != "Phase1") return;
 
+        PlayUISound(SFXType.UI_Touch); // [추가] 성공 시 사운드
         Log("체험을 시작합니다.");
 
         // GameManager를 통한 씬 상태 전환
-        if (GameManager.Instance.currentPlayState == GameManager.PlayState.Test) { if (GameManager.Instance != null) GameManager.Instance.ChangeState(GameManager.GameState.GameStage); }
-        else { if (GameManager.Instance != null) GameManager.Instance.ChangeState(GameManager.GameState.CharacterSelect); }
+        if (GameManager.Instance.currentPlayState == GameManager.PlayState.Test)
+        {
+            if (GameManager.Instance != null) GameManager.Instance.ChangeState(GameManager.GameState.GameStage);
+        }
+        else
+        {
+            if (GameManager.Instance != null) GameManager.Instance.ChangeState(GameManager.GameState.CharacterSelect);
+        }
     }
 
     public void UpdateBGMVolume(int value)

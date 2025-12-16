@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: dedf8fc214d3c0b429776834f028f3af
+timeCreated: 1508202199
+licenseType: Store
+DefaultImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 6630
+  packageName: Logitech Gaming SDK
+  packageVersion: 1.7
+  assetPath: Assets/Logitech SDK/LogitechSteeringWheel.lib
+  uploadId: 723636

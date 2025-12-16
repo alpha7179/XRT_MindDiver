@@ -1,10 +1,10 @@
-using Mover;
+using Mover; // EnemyMover가 있는 네임스페이스라고 가정
 using System;
 using UnityEngine;
 
 /// <summary>
 /// 게임 내 데이터(점수, 스탯, 진행도 등) 및 통계를 관리하는 클래스
-/// - 수정됨: FindObjectsOfType -> FindObjectsByType (최신 유니티 API 적용)
+/// - 수정됨: AudioManager 연결 및 SFX 쿨타임 로직 추가
 /// </summary>
 public class DataManager : MonoBehaviour
 {
@@ -19,7 +19,6 @@ public class DataManager : MonoBehaviour
 
     #region Inspector Fields
     [Header("Video Settings")]
-    // 현재 설정된 비디오 타입
     [SerializeField] public VideoType currentVideoType;
 
     [Header("Setting Data")]
@@ -30,64 +29,49 @@ public class DataManager : MonoBehaviour
     [SerializeField] private LangType currentLangType;
 
     [Header("In-Game Data")]
-    // 게임 진행도
     [SerializeField][Range(0, 100)] private float progress;
-    // 팀 점수
     [SerializeField] private int teamScore;
-    // 우주선 체력
     [SerializeField][Range(0, 100)] private int shipHealth;
-    // 최대 체력 수치
     [SerializeField] public int maxShipHealth = 100;
-    // 우주선 쉴드
     [SerializeField][Range(0, 100)] private int shipShield;
-    // 최대 쉴드 수치
     [SerializeField] public int maxShipShield = 100;
-    // 버퍼 게이지 사용량
-    [SerializeField][Range(0, 10)] public int bufferUse = 5;
-    // 버퍼 게이지 충전량
-    [SerializeField][Range(0, 10)] private int bufferCharge;
-    // 버퍼 지속시간
+
+    [Header("Skill Settings")]
+    [SerializeField][Range(0, 100)] public int bufferUse = 50;
+    [SerializeField][Range(0, 100)] private int bufferCharge;
     [SerializeField][Range(0, 10)] public float buffDuration = 10f;
-    // 버퍼 상태
     [SerializeField] public bool isBuffState;
-    // 디버퍼 게이지 사용량
-    [SerializeField][Range(0, 10)] public int debufferUse = 5;
-    // 디버퍼 게이지 충전량
-    [SerializeField][Range(0, 10)] private int debufferCharge;
-    // 디버퍼 지속시간
+
+    [SerializeField][Range(0, 100)] public int debufferUse = 50;
+    [SerializeField][Range(0, 100)] private int debufferCharge;
     [SerializeField][Range(0, 10)] public float DebuffDuration = 10f;
-    // 디버퍼 상태
     [SerializeField] public bool isDebuffState;
-    // 게이지 최대 충전량
-    [SerializeField] private int maxCharge = 10;
-    // 현재 보유 총알 수
+
+    [SerializeField] private int maxCharge = 100;
+
+    [Header("Ammo")]
     [SerializeField][Range(0, 9999)] private int bullet;
-    // 최대 보유 가능 총알 수
     [SerializeField] public int maxBullet = 9999;
 
     [Header("Statistics")]
-    // 총 플레이 시간 (초 단위)
     [SerializeField] private float totalPlayTime;
-    // 처치한 적 수
     [SerializeField] private int totalEnemiesKilled;
-    // 받은 총 데미지
     [SerializeField] private int totalDamageTaken;
 
     [Header("Debug Settings")]
-    // 디버그 로그 출력 여부
     [SerializeField] private bool isDebugMode = true;
     #endregion
 
     #region Private Fields
-    // 타이머 작동 여부 확인
     private bool _isTimerRunning = false;
-    // 버퍼 타이머
     private float _bufferTimer = 0f;
-    // 디버퍼 타이머
     private float _debufferTimer = 0f;
-
-    // 쉴드 회복량 계산을 위한 누적 변수
     private float _shieldRegenAccumulator = 0f;
+
+    // [추가됨] 데미지 사운드 중복 재생 방지용 타이머
+    private float _lastDamageTime = -10f;
+    // [추가됨] 데미지 사운드 최소 간격 (초 단위, 0.1초)
+    private const float DamageSoundCooldown = 0.1f;
     #endregion
 
     #region Events
@@ -119,32 +103,25 @@ public class DataManager : MonoBehaviour
             totalPlayTime += Time.deltaTime;
         }
 
-        // --- 버퍼(무적 + 쉴드 회복) 지속시간 체크 및 로직 ---
+        // --- 버퍼(무적 + 쉴드 회복) 지속시간 체크 ---
         if (isBuffState)
         {
-            // 1. 지속시간 감소
             _bufferTimer -= Time.deltaTime;
 
-            // 2. 쉴드 서서히 회복 로직
             if (shipShield < maxShipShield)
             {
-                float totalRegenAmount = maxShipShield * 0.5f; // 목표 회복량 (절반)
-                float regenPerSecond = totalRegenAmount / buffDuration; // 초당 회복량
-
-                // 프레임당 회복량을 누적
+                float totalRegenAmount = maxShipShield * 0.5f;
+                float regenPerSecond = totalRegenAmount / buffDuration;
                 _shieldRegenAccumulator += regenPerSecond * Time.deltaTime;
 
                 if (_shieldRegenAccumulator >= 1f)
                 {
                     int amountToAdd = (int)_shieldRegenAccumulator;
                     _shieldRegenAccumulator -= amountToAdd;
-
-                    // 쉴드 적용
                     SetShipShield(Mathf.Min(shipShield + amountToAdd, maxShipShield));
                 }
             }
 
-            // 3. 종료 체크
             if (_bufferTimer <= 0)
             {
                 isBuffState = false;
@@ -158,18 +135,14 @@ public class DataManager : MonoBehaviour
         {
             _debufferTimer -= Time.deltaTime;
 
-            // 디버프 시간 종료 시
             if (_debufferTimer <= 0)
             {
                 isDebuffState = false;
-
-                // [수정됨] 최신 API 사용 (FindObjectsSortMode.None으로 성능 최적화)
                 EnemyMover[] enemies = FindObjectsByType<EnemyMover>(FindObjectsSortMode.None);
                 foreach (var enemy in enemies)
                 {
                     if (enemy != null) enemy.DebuffEnd();
                 }
-
                 Log("[DataManager] Debuffer Effect Ended (All Enemies Restored)");
             }
         }
@@ -180,7 +153,7 @@ public class DataManager : MonoBehaviour
     public void SetVideoType(VideoType type)
     {
         currentVideoType = type;
-        GameManager.Instance.Log($"[DataManager] Set Video Type: {type}");
+        Log($"[DataManager] Set Video Type: {type}");
     }
 
     public void InitializeSettingData()
@@ -193,9 +166,11 @@ public class DataManager : MonoBehaviour
         _isTimerRunning = true;
         Log("[DataManager] Setting Data Initialized");
     }
+
     public void InitializeGameData()
     {
-        IngameUIManager.Instance.InitializeSliders();
+        if (IngameUIManager.Instance != null)
+            IngameUIManager.Instance.InitializeSliders();
 
         SetProgress(0);
         SetScore(0);
@@ -217,14 +192,15 @@ public class DataManager : MonoBehaviour
         SetTotalPlayTime(0);
 
         _isTimerRunning = true;
-        GameManager.Instance.Log("[DataManager] Game Data Initialized");
+        Log("[DataManager] Game Data Initialized");
     }
 
     public void StopTimer() => _isTimerRunning = false;
     #endregion
 
-    #region Public Methods - Data Access
-    // --- Progress ---
+    #region Public Methods - Data Access & Logic
+
+    // ... (Volume, Progress, Score Getter/Setters 생략 - 기존과 동일) ...
     public int GetBGMVolume() { return BGMVolume; }
     public void SetBGMVolume(int value) { BGMVolume = value; }
     public int GetSFXVolume() { return SFXVolume; }
@@ -234,18 +210,12 @@ public class DataManager : MonoBehaviour
     public int GetNARVolume() { return NARVolume; }
     public void SetNARVolume(int value) { NARVolume = value; }
     public float GetProgress() { return progress; }
-    public void SetProgress(float value) { progress = value; IngameUIManager.Instance.UpdateProgress(progress); }
-
-    // --- Score ---
-    public void AddScore(int amount) { teamScore += amount; IngameUIManager.Instance.UpdateScore(teamScore); }
+    public void SetProgress(float value) { progress = value; if (IngameUIManager.Instance) IngameUIManager.Instance.UpdateProgress(progress); }
+    public void AddScore(int amount) { teamScore += amount; if (IngameUIManager.Instance) IngameUIManager.Instance.UpdateScore(teamScore); }
     public int GetScore() { return teamScore; }
-    public void SetScore(int value) { teamScore = value; IngameUIManager.Instance.UpdateScore(teamScore); }
+    public void SetScore(int value) { teamScore = value; if (IngameUIManager.Instance) IngameUIManager.Instance.UpdateScore(teamScore); }
 
-    // --- Shield / Health ---
-    /*
-     * 데미지 피격 처리 및 쉴드 감소
-     * 버퍼 활성화 시 무적 처리
-     */
+    // --- Shield / Health (Damage Logic) ---
     public void TakeDamage(int amount)
     {
         // 1. 버퍼 상태(무적) 확인
@@ -255,30 +225,65 @@ public class DataManager : MonoBehaviour
             return;
         }
 
-        // 2. 기존 데미지 로직 수행
+        bool isShieldHit = false;
+
+        // 2. 데미지 계산 로직
         if (shipShield > 0)
         {
-            if (shipShield >= amount) shipShield -= amount;
-            else if ((shipShield + shipHealth) >= amount) { shipHealth -= (amount - shipShield); shipShield = 0; }
-            else { shipHealth = 0; IngameUIManager.Instance.UpdateHP(shipHealth); shipShield = 0; }
-            IngameUIManager.Instance.UpdateShield(shipShield);
+            isShieldHit = true; // 쉴드가 남아있을 때 맞음
+            if (shipShield >= amount)
+            {
+                shipShield -= amount;
+            }
+            else if ((shipShield + shipHealth) >= amount)
+            {
+                // 쉴드가 깨지면서 체력도 깎임 (관통) -> 이 경우 소리는 '깨짐' or '피격' 중 선택. 여기선 쉴드 피격음 우선
+                shipHealth -= (amount - shipShield);
+                shipShield = 0;
+            }
+            else
+            {
+                shipHealth = 0;
+                shipShield = 0;
+                if (IngameUIManager.Instance) IngameUIManager.Instance.UpdateHP(shipHealth);
+            }
+
+            if (IngameUIManager.Instance) IngameUIManager.Instance.UpdateShield(shipShield);
             OnShieldChanged?.Invoke(shipShield, maxShipShield);
         }
         else
         {
+            isShieldHit = false; // 쉴드 없음, 맨몸 피격
             if (shipHealth >= amount) shipHealth -= amount;
-            else { shipHealth = 0; }
-            IngameUIManager.Instance.UpdateHP(shipHealth);
+            else shipHealth = 0;
+
+            if (IngameUIManager.Instance) IngameUIManager.Instance.UpdateHP(shipHealth);
             OnHealthChanged?.Invoke(shipHealth, maxShipHealth);
         }
+
         totalDamageTaken += amount;
+
+        // 3. [추가됨] 데미지 사운드 처리 (쿨타임 적용)
+        if (AudioManager.Instance != null && Time.time - _lastDamageTime >= DamageSoundCooldown)
+        {
+            _lastDamageTime = Time.time; // 마지막 재생 시간 갱신
+
+            if (isShieldHit)
+            {
+                AudioManager.Instance.PlaySFX(SFXType.Damage_Shield);
+            }
+            else
+            {
+                AudioManager.Instance.PlaySFX(SFXType.Damage_Player);
+            }
+        }
     }
 
     public int GetShipHealth() { return shipHealth; }
     public void SetShipHealth(int value)
     {
         shipHealth = value;
-        IngameUIManager.Instance.UpdateHP(shipHealth);
+        if (IngameUIManager.Instance) IngameUIManager.Instance.UpdateHP(shipHealth);
         OnHealthChanged?.Invoke(shipHealth, maxShipHealth);
     }
 
@@ -286,24 +291,31 @@ public class DataManager : MonoBehaviour
     public void SetShipShield(int value)
     {
         shipShield = value;
-        IngameUIManager.Instance.UpdateShield(shipShield);
+        if (IngameUIManager.Instance) IngameUIManager.Instance.UpdateShield(shipShield);
         OnShieldChanged?.Invoke(shipShield, maxShipShield);
     }
 
     public int GetTotalDamageTaken() { return totalDamageTaken; }
     public void SetTotalDamageTaken(int value) { totalDamageTaken = value; }
 
-    // --- Buffer / Debuffer ---
-    public void AddBuffer(int amount) { bufferCharge = Mathf.Min(bufferCharge + amount, maxCharge); IngameUIManager.Instance.UpdateBuff(bufferCharge); }
+    // --- Buffer (Skill) ---
+    public void AddBuffer(int amount)
+    {
+        bufferCharge = Mathf.Min(bufferCharge + amount, maxCharge);
+        if (IngameUIManager.Instance) IngameUIManager.Instance.UpdateBuff(bufferCharge);
+
+        // [추가됨] 아이템 획득(충전) 시 사운드 (amount가 양수일 때만)
+        if (amount > 0 && AudioManager.Instance != null)
+        {
+            //AudioManager.Instance.PlaySFX(SFXType.Collect_Energy);
+        }
+    }
     public int GetBuffer() { return bufferCharge; }
-    public void SetBuffer(int value) { bufferCharge = value; IngameUIManager.Instance.UpdateBuff(bufferCharge); }
+    public void SetBuffer(int value) { bufferCharge = value; if (IngameUIManager.Instance) IngameUIManager.Instance.UpdateBuff(bufferCharge); }
 
     public bool GetBuffState() { return isBuffState; }
     public void SetBuffState(bool value) { isBuffState = value; }
 
-    /*
-     * 버퍼 활성화
-     */
     public void ActivateBuff()
     {
         if (bufferCharge >= bufferUse)
@@ -311,7 +323,12 @@ public class DataManager : MonoBehaviour
             isBuffState = true;
             _bufferTimer = buffDuration;
             _shieldRegenAccumulator = 0f;
-            AddBuffer(-bufferUse);
+            AddBuffer(-bufferUse); // 사용 시 차감 (사운드 재생 안됨, amount가 음수이므로)
+
+            // [추가됨] 버프 스킬 사운드
+            if (AudioManager.Instance != null)
+                AudioManager.Instance.PlaySFX(SFXType.Skill_Buff);
+
             Log("[DataManager] Buffer Activated: Invincible + Shield Regen");
         }
         else
@@ -320,17 +337,24 @@ public class DataManager : MonoBehaviour
         }
     }
 
+    // --- Debuffer (Skill) ---
+    public void AddDeBuffer(int amount)
+    {
+        debufferCharge = Mathf.Min(debufferCharge + amount, maxCharge);
+        if (IngameUIManager.Instance) IngameUIManager.Instance.UpdateDeBuff(debufferCharge);
 
-    public void AddDeBuffer(int amount) { debufferCharge = Mathf.Min(debufferCharge + amount, maxCharge); IngameUIManager.Instance.UpdateDeBuff(debufferCharge); }
+        // [추가됨] 아이템 획득 사운드
+        if (amount > 0 && AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlaySFX(SFXType.Collect_Energy);
+        }
+    }
     public int GetDeBuffer() { return debufferCharge; }
-    public void SetDeBuffer(int value) { debufferCharge = value; IngameUIManager.Instance.UpdateDeBuff(debufferCharge); }
+    public void SetDeBuffer(int value) { debufferCharge = value; if (IngameUIManager.Instance) IngameUIManager.Instance.UpdateDeBuff(debufferCharge); }
 
     public bool GetDebuffState() { return isDebuffState; }
     public void SetDebuffState(bool value) { isDebuffState = value; }
 
-    /*
-     * 디버퍼 활성화
-     */
     public void ActivateDebuff()
     {
         if (debufferCharge >= debufferUse)
@@ -339,12 +363,15 @@ public class DataManager : MonoBehaviour
             _debufferTimer = DebuffDuration;
             AddDeBuffer(-debufferUse);
 
-            // [수정됨] 최신 API 사용 (FindObjectsSortMode.None으로 성능 최적화)
             EnemyMover[] enemies = FindObjectsByType<EnemyMover>(FindObjectsSortMode.None);
             foreach (var enemy in enemies)
             {
                 if (enemy != null) enemy.DebuffStart();
             }
+
+            // [추가됨] 디버프 스킬 사운드
+            if (AudioManager.Instance != null)
+                AudioManager.Instance.PlaySFX(SFXType.Skill_Debuff);
 
             Log("[DataManager] Debuffer Activated (All Enemies Weakened)");
         }
@@ -355,9 +382,19 @@ public class DataManager : MonoBehaviour
     }
 
     // --- Bullet ---
-    public void AddBullet(int amount) { bullet += amount; IngameUIManager.Instance.UpdateBullet(bullet); }
+    public void AddBullet(int amount)
+    {
+        bullet += amount;
+        if (IngameUIManager.Instance) IngameUIManager.Instance.UpdateBullet(bullet);
+
+        // [추가됨] 총알 아이템 획득 시에도 에너지 수집 사운드 재생 (원하시면 변경 가능)
+        if (amount > 0 && AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlaySFX(SFXType.Collect_Energy);
+        }
+    }
     public int GetBullet() { return bullet; }
-    public void SetBullet(int value) { bullet = value; IngameUIManager.Instance.UpdateBullet(bullet); }
+    public void SetBullet(int value) { bullet = value; if (IngameUIManager.Instance) IngameUIManager.Instance.UpdateBullet(bullet); }
 
     // --- Statistics ---
     public void IncrementKillCount() => totalEnemiesKilled++;

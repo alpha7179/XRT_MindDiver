@@ -1,11 +1,12 @@
-using System.Collections.Generic;
 using System.Collections;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
 /// 게임 종료 후 결과(Result) 화면의 UI 흐름과 연출을 관리하는 매니저
+/// - 수정됨: 별 등장 및 입력 시 SFX 추가
 /// </summary>
 public class OuttroUIManager : MonoBehaviour
 {
@@ -49,7 +50,6 @@ public class OuttroUIManager : MonoBehaviour
     #region Unity Lifecycle
     private void Awake()
     {
-
         // 초기화: 패널들은 꺼두기
         if (resultPanel != null) resultPanel.SetActive(false);
         if (summaryPanel != null) summaryPanel.SetActive(false);
@@ -63,6 +63,7 @@ public class OuttroUIManager : MonoBehaviour
             // 키보드 Space, Enter 또는 게임패드 'A' 버튼 대응
             if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return) || Input.GetButtonDown("Submit"))
             {
+                PlayUISound(SFXType.UI_Touch); // [추가] 홈 이동 입력 사운드
                 GoHome();
             }
         }
@@ -82,6 +83,15 @@ public class OuttroUIManager : MonoBehaviour
     #endregion
 
     #region Logic Methods (Initialization & Navigation)
+
+    // [추가] 사운드 재생 헬퍼
+    private void PlayUISound(SFXType type)
+    {
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlaySFX(type);
+        }
+    }
 
     /// <summary>
     /// 결과 화면 초기화 코루틴
@@ -138,6 +148,10 @@ public class OuttroUIManager : MonoBehaviour
             if (i < starIcons.Length && starIcons[i] != null)
             {
                 FadeInAndPulseStar(starIcons[i]);
+
+                // [추가] 별 등장 시 사운드 (아이템 수집음 등을 활용해 보상 느낌 주기)
+                PlayUISound(SFXType.Collect_Energy);
+
                 // 쾅! 하는 느낌을 주기 위해 잠시 대기
                 yield return new WaitForSeconds(0.4f);
             }
@@ -249,7 +263,7 @@ public class OuttroUIManager : MonoBehaviour
     }
 
     /// <summary>
-    /// [누락되었던 부분 구현] 이미지를 페이드 인/아웃 하고 옵션에 따라 펄스 효과 실행
+    /// 이미지를 페이드 인/아웃 하고 옵션에 따라 펄스 효과 실행
     /// </summary>
     private IEnumerator FadeImageRoutine(Image targetImage, float targetAlpha, bool pulseAfter)
     {

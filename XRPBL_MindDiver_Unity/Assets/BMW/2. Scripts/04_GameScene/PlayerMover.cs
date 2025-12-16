@@ -355,12 +355,12 @@ public class PlayerMover : MonoBehaviour
 #endif
     }
     private void HandleSkillInput() { if (DataManager.Instance == null) return; if (Input.GetKeyDown(KeyCode.Z) || GetLogiButtonDown(11)) OnClickBuffButton(); if (Input.GetKeyDown(KeyCode.X) || GetLogiButtonDown(10)) OnClickDebuffButton(); if (Input.GetKeyDown(KeyCode.C) || GetLogiButtonDown(7)) { if (IngameUIManager.Instance != null) { if (!IngameUIManager.Instance.GetDisplayPanel()) IngameUIManager.Instance.OnClickPauseButton(); else { if (GameManager.Instance.IsPaused) IngameUIManager.Instance.OnClickContinueButton(); else if (GameManager.Instance.IsFailed) IngameUIManager.Instance.OnClickRetryButton(); else if (outtroUIManager != null) outtroUIManager.GoHome(); } } } if (Input.GetKeyDown(KeyCode.B) || GetLogiButtonDown(6)) { if (IngameUIManager.Instance != null && IngameUIManager.Instance.GetDisplayPanel()) { if (GameManager.Instance.IsPaused || GameManager.Instance.IsFailed) IngameUIManager.Instance.OnClickBackButton(); } } }
-    public void OnClickBuffButton() { if (DataManager.Instance.GetBuffer() >= DataManager.Instance.bufferUse) { int cost = DataManager.Instance.bufferUse; DataManager.Instance.SetBuffer(Mathf.Max(0, DataManager.Instance.GetBuffer() - cost)); if (IngameUIManager.Instance != null) { IngameUIManager.Instance.Log("Buff Activated"); DataManager.Instance.SetShipShield(DataManager.Instance.maxShipShield); } } }
-    public void OnClickDebuffButton() { if (DataManager.Instance.GetDeBuffer() >= DataManager.Instance.debufferUse) { int cost = DataManager.Instance.debufferUse; DataManager.Instance.SetDeBuffer(Mathf.Max(0, DataManager.Instance.GetDeBuffer() - cost)); if (IngameUIManager.Instance != null) IngameUIManager.Instance.Log("Debuff Activated"); } }
+    public void OnClickBuffButton() { DataManager.Instance.ActivateBuff(); }
+    public void OnClickDebuffButton() { DataManager.Instance.ActivateDebuff(); }
     private void CheckGameOver() { if (DataManager.Instance != null && IngameUIManager.Instance != null) { if (DataManager.Instance.GetShipHealth() <= 0 && !IngameUIManager.Instance.GetDisplayPanel()) { IngameUIManager.Instance.OnClickFailButton(); } } }
     private void ActivateShield() { if (shieldEffect != null) { shieldEffect.SetActive(true); CancelInvoke(nameof(DeactivateShield)); Invoke(nameof(DeactivateShield), 3f); } }
     private void DeactivateShield() { if (shieldEffect != null) shieldEffect.SetActive(false); }
-    private void OnTriggerEnter(Collider other) { if (other.CompareTag("Obstacle")) { if (DataManager.Instance != null) DataManager.Instance.TakeDamage(20); if (AudioManager.Instance != null) AudioManager.Instance.PlaySFX(SFXType.ShieldHit); Destroy(other.gameObject); } }
+    private void OnTriggerEnter(Collider other) { if (other.CompareTag("Obstacle")) { if (DataManager.Instance != null) DataManager.Instance.TakeDamage(20); } }
     private void OnDrawGizmos() { Gizmos.color = Color.yellow; Vector3 center = new Vector3(0, 0, transform.position.z); Vector3 size = new Vector3(xLimit * 2, yLimit * 2, 10f); Gizmos.DrawWireCube(center, size); }
     #endregion
 

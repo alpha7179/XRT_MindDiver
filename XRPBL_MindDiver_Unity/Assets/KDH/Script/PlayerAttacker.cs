@@ -1,16 +1,15 @@
 using Energy;
-using System.Collections.Generic; // List를 사용하기 위해 추가
+using System.Collections.Generic;
 using UnityEngine;
 
 public class PlayerAttacker : MonoBehaviour
 {
-    // 카메라들을 저장할 리스트 (씬의 모든 카메라를 가져올 수도 있고, Inspector에서 수동 할당할 수도 있습니다.)
+    // 카메라들을 저장할 리스트
     private List<Camera> activeCameras = new List<Camera>();
 
     private void Start()
     {
         // 씬에 있는 모든 활성화된 카메라 컴포넌트를 가져옵니다.
-        // 플레이어에게 부착된 카메라만 따로 필터링할 수도 있지만, 이 방법이 가장 간단합니다.
         activeCameras.AddRange(FindObjectsByType<Camera>(FindObjectsSortMode.None));
 
         if (activeCameras.Count == 0)
@@ -26,8 +25,18 @@ public class PlayerAttacker : MonoBehaviour
         // 마우스 왼쪽 버튼(0번)이 눌렸는지 확인합니다.
         if (Input.GetMouseButtonDown(0))
         {
-            if(DataManager.Instance != null) DataManager.Instance.SetBullet(DataManager.Instance.GetBullet() - 1);
-            HandleClick();
+            // [수정] 총알이 있는지 먼저 확인하고 발사 로직 수행
+            if (DataManager.Instance != null && DataManager.Instance.GetBullet() > 0)
+            {
+                // 1. 발사 사운드 재생
+                PlaySound(SFXType.Attack_Player);
+
+                // 2. 총알 차감
+                //DataManager.Instance.SetBullet(DataManager.Instance.GetBullet() - 1);
+
+                // 3. 레이캐스트 판정
+                HandleClick();
+            }
         }
     }
 
@@ -36,35 +45,35 @@ public class PlayerAttacker : MonoBehaviour
         // 모든 카메라를 순회하며 Raycast 검사
         foreach (Camera cam in activeCameras)
         {
-            // 카메라가 활성화되어 있지 않거나, 널(null)이면 건너뜁니다.
-            if (cam == null || !cam.isActiveAndEnabled)
-            {
-                continue;
-            }
+            if (cam == null || !cam.isActiveAndEnabled) continue;
 
-            // 현재 카메라의 뷰포트를 기준으로 Ray를 생성합니다.
             Ray ray = cam.ScreenPointToRay(Input.mousePosition);
             RaycastHit hit;
 
-            // Raycast 수행: Ray가 오브젝트에 맞았는지 확인합니다.
             if (Physics.Raycast(ray, out hit, 100f))
             {
-                // 충돌한 오브젝트에서 EnemyHealth 컴포넌트 찾기
                 EnemyHealth enemy = hit.transform.GetComponent<EnemyHealth>();
                 EnergyClass energy = hit.transform.GetComponent<EnergyClass>();
 
+                // 적(Enemy) 적중 시
                 if (enemy != null)
                 {
-                    // 적 발견 시 데미지를 줍니다.
                     enemy.TakeDamage(enemy.damagePerClick);
 
-                    //클릭이 성공했으므로, 더 이상 다른 카메라를 확인할 필요 없이 함수를 종료합니다.
+                    // [추가] 적 타격 사운드
+                    PlaySound(SFXType.Damage_Enemy);
+
                     return;
                 }
-                if (energy!= null)
+
+                // 에너지(Energy) 적중 시
+                if (energy != null)
                 {
-                    // 적 발견 시 데미지를 줍니다.
                     energy.TakeDamage(energy.damagePerClick);
+
+                    // [추가] 에너지 타격(수집) 사운드
+                    PlaySound(SFXType.Collect_Energy);
+
                     return;
                 }
             }
@@ -75,10 +84,20 @@ public class PlayerAttacker : MonoBehaviour
     {
         if (DataManager.Instance != null && IngameUIManager.Instance != null)
         {
+            // 총알이 0 이하이고, 이미 실패 창이 떠있지 않다면 실패 처리
             if (DataManager.Instance.GetBullet() <= 0 && !IngameUIManager.Instance.GetDisplayPanel())
             {
                 IngameUIManager.Instance.OnClickFailButton();
             }
+        }
+    }
+
+    // [추가] 사운드 재생 헬퍼 메서드
+    private void PlaySound(SFXType type)
+    {
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlaySFX(type);
         }
     }
 }

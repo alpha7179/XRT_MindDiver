@@ -866,7 +866,7 @@ PrefabInstance:
     - target: {fileID: 306860498368456320, guid: 883f671825e08e24f8a62ddf509ea597,
         type: 3}
       propertyPath: currentPlayState
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1448566587122566905, guid: 883f671825e08e24f8a62ddf509ea597,
         type: 3}
@@ -935,9 +935,74 @@ PrefabInstance:
       objectReference: {fileID: 1561598838}
     - target: {fileID: 1648014120842487201, guid: 883f671825e08e24f8a62ddf509ea597,
         type: 3}
+      propertyPath: bgm_Phase1
+      value: 
+      objectReference: {fileID: 0}
+    - target: {fileID: 1648014120842487201, guid: 883f671825e08e24f8a62ddf509ea597,
+        type: 3}
       propertyPath: bgm_MainMenu
       value: 
       objectReference: {fileID: 8300000, guid: 39831fc32b1b01345b43057294fe9c73, type: 3}
+    - target: {fileID: 1648014120842487201, guid: 883f671825e08e24f8a62ddf509ea597,
+        type: 3}
+      propertyPath: bgm_PrePhase
+      value: 
+      objectReference: {fileID: 8300000, guid: 4652532e7515ec94cb7bbd6854764e88, type: 3}
+    - target: {fileID: 1648014120842487201, guid: 883f671825e08e24f8a62ddf509ea597,
+        type: 3}
+      propertyPath: sfx_UI_Touch
+      value: 
+      objectReference: {fileID: 8300000, guid: d96abde41da03944eb1155a80ac7a251, type: 3}
+    - target: {fileID: 1648014120842487201, guid: 883f671825e08e24f8a62ddf509ea597,
+        type: 3}
+      propertyPath: sfx_Popup_Fail
+      value: 
+      objectReference: {fileID: 8300000, guid: c0d70a7fec26bf14fbdf869fabbea530, type: 3}
+    - target: {fileID: 1648014120842487201, guid: 883f671825e08e24f8a62ddf509ea597,
+        type: 3}
+      propertyPath: sfx_Skill_Buff
+      value: 
+      objectReference: {fileID: 8300000, guid: ea2074e903e5b0c4c92b373b5ff7b321, type: 3}
+    - target: {fileID: 1648014120842487201, guid: 883f671825e08e24f8a62ddf509ea597,
+        type: 3}
+      propertyPath: sfx_Popup_Pause
+      value: 
+      objectReference: {fileID: 8300000, guid: 5641b516c2fd99f45b8c6f0e539f1e8f, type: 3}
+    - target: {fileID: 1648014120842487201, guid: 883f671825e08e24f8a62ddf509ea597,
+        type: 3}
+      propertyPath: sfx_Damage_Enemy
+      value: 
+      objectReference: {fileID: 8300000, guid: 1c90eeb85e9213c4ba4083c298610c25, type: 3}
+    - target: {fileID: 1648014120842487201, guid: 883f671825e08e24f8a62ddf509ea597,
+        type: 3}
+      propertyPath: sfx_Skill_Debuff
+      value: 
+      objectReference: {fileID: 8300000, guid: 20932ab52a5cf5243bc97a5e2380706f, type: 3}
+    - target: {fileID: 1648014120842487201, guid: 883f671825e08e24f8a62ddf509ea597,
+        type: 3}
+      propertyPath: sfx_Attack_Player
+      value: 
+      objectReference: {fileID: 8300000, guid: 63041dcb099051d4cbe125a9be9ede2d, type: 3}
+    - target: {fileID: 1648014120842487201, guid: 883f671825e08e24f8a62ddf509ea597,
+        type: 3}
+      propertyPath: sfx_Damage_Player
+      value: 
+      objectReference: {fileID: 8300000, guid: 4a71e44e53788084a811e06950df1c9f, type: 3}
+    - target: {fileID: 1648014120842487201, guid: 883f671825e08e24f8a62ddf509ea597,
+        type: 3}
+      propertyPath: sfx_Damage_Shield
+      value: 
+      objectReference: {fileID: 8300000, guid: 3ccc457f99c958048b390adf6ab7a336, type: 3}
+    - target: {fileID: 1648014120842487201, guid: 883f671825e08e24f8a62ddf509ea597,
+        type: 3}
+      propertyPath: sfx_Popup_Success
+      value: 
+      objectReference: {fileID: 8300000, guid: b4911060562f6ed41807095bd53fb78c, type: 3}
+    - target: {fileID: 1648014120842487201, guid: 883f671825e08e24f8a62ddf509ea597,
+        type: 3}
+      propertyPath: sfx_Collect_Energy
+      value: 
+      objectReference: {fileID: 8300000, guid: 587d8db3f2356354aaea288b99c92e80, type: 3}
     - target: {fileID: 1648014120842487201, guid: 883f671825e08e24f8a62ddf509ea597,
         type: 3}
       propertyPath: bgm_CharacterSelect
@@ -950,6 +1015,16 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6896035521004701258, guid: 883f671825e08e24f8a62ddf509ea597,
         type: 3}
+      propertyPath: bufferUse
+      value: 50
+      objectReference: {fileID: 0}
+    - target: {fileID: 6896035521004701258, guid: 883f671825e08e24f8a62ddf509ea597,
+        type: 3}
+      propertyPath: maxCharge
+      value: 100
+      objectReference: {fileID: 0}
+    - target: {fileID: 6896035521004701258, guid: 883f671825e08e24f8a62ddf509ea597,
+        type: 3}
       propertyPath: shipHealth
       value: 100
       objectReference: {fileID: 0}
@@ -957,6 +1032,11 @@ PrefabInstance:
         type: 3}
       propertyPath: shipShield
       value: 100
+      objectReference: {fileID: 0}
+    - target: {fileID: 6896035521004701258, guid: 883f671825e08e24f8a62ddf509ea597,
+        type: 3}
+      propertyPath: debufferUse
+      value: 50
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

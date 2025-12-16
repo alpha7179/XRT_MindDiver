@@ -53,37 +53,37 @@ public class LogitechGSDK
     // ------------------------------------------------------------------------
     // 기본 DLL Import (초기화, 업데이트, 입력 읽기)
     // ------------------------------------------------------------------------
-    [DllImport("LogitechSteeringWheelEnginesWrapper", CharSet = CharSet.Unicode, CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("LogitechSteeringWheelEnginesWrapper.dll", CharSet = CharSet.Unicode, CallingConvention = CallingConvention.Cdecl)]
     public static extern bool LogiSteeringInitialize(bool ignoreXInputControllers);
 
-    [DllImport("LogitechSteeringWheelEnginesWrapper", CharSet = CharSet.Unicode, CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("LogitechSteeringWheelEnginesWrapper.dll", CharSet = CharSet.Unicode, CallingConvention = CallingConvention.Cdecl)]
     public static extern bool LogiUpdate();
 
-    [DllImport("LogitechSteeringWheelEnginesWrapper", CharSet = CharSet.Unicode, CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("LogitechSteeringWheelEnginesWrapper.dll", CharSet = CharSet.Unicode, CallingConvention = CallingConvention.Cdecl)]
     public static extern IntPtr LogiGetState(int index);
 
-    [DllImport("LogitechSteeringWheelEnginesWrapper", CharSet = CharSet.Unicode, CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("LogitechSteeringWheelEnginesWrapper.dll", CharSet = CharSet.Unicode, CallingConvention = CallingConvention.Cdecl)]
     public static extern void LogiSteeringShutdown();
 
-    [DllImport("LogitechSteeringWheelEnginesWrapper", CharSet = CharSet.Unicode, CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("LogitechSteeringWheelEnginesWrapper.dll", CharSet = CharSet.Unicode, CallingConvention = CallingConvention.Cdecl)]
     public static extern bool LogiIsConnected(int index);
 
     // ------------------------------------------------------------------------
-    // [추가됨] 포스 피드백 (Force Feedback) 관련 DLL Import
+    // 피드백 (Force Feedback) 관련 DLL Import
     // ------------------------------------------------------------------------
 
     // 1. 스프링 포스 (중앙 복귀 탄성)
-    [DllImport("LogitechSteeringWheelEnginesWrapper", CharSet = CharSet.Unicode, CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("LogitechSteeringWheelEnginesWrapper.dll", CharSet = CharSet.Unicode, CallingConvention = CallingConvention.Cdecl)]
     public static extern bool LogiPlaySpringForce(int index, int offsetPercentage, int saturationPercentage, int coefficientPercentage);
 
-    [DllImport("LogitechSteeringWheelEnginesWrapper", CharSet = CharSet.Unicode, CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("LogitechSteeringWheelEnginesWrapper.dll", CharSet = CharSet.Unicode, CallingConvention = CallingConvention.Cdecl)]
     public static extern bool LogiStopSpringForce(int index);
 
     // 2. 댐퍼 포스 (묵직한 저항감)
-    [DllImport("LogitechSteeringWheelEnginesWrapper", CharSet = CharSet.Unicode, CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("LogitechSteeringWheelEnginesWrapper.dll", CharSet = CharSet.Unicode, CallingConvention = CallingConvention.Cdecl)]
     public static extern bool LogiPlayDamperForce(int index, int coefficientPercentage);
 
-    [DllImport("LogitechSteeringWheelEnginesWrapper", CharSet = CharSet.Unicode, CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("LogitechSteeringWheelEnginesWrapper.dll", CharSet = CharSet.Unicode, CallingConvention = CallingConvention.Cdecl)]
     public static extern bool LogiStopDamperForce(int index);
 
     // ------------------------------------------------------------------------
